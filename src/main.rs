@@ -2,11 +2,10 @@ mod cli;
 mod nixlib;
 
 use clap::Parser;
-use eyre::Result;
-
+use eyre::{Result, bail};
 use nixlib::FlakeReference;
-
 use crate::cli::{Cli, Command};
+use nix::unistd;
 
 fn flakerefs_or_default(refs: &Vec<FlakeReference>) -> Result<Vec<FlakeReference>> {
     if refs.is_empty() {
@@ -25,10 +24,30 @@ fn main() -> Result<()> {
         Command::Build { systems } => {
             let system_attributes = flakerefs_or_default(systems)?;
             println!("Building systems: {}", system_attributes.iter().map(|f| f.to_string()).collect::<Vec<String>>().join(" "));
+
         }
-        Command::Switch { systems } => {
+        Command::SwitchRemote { systems } => {
             let system_attributes = flakerefs_or_default(systems)?;
             println!("Switching systems: {}", system_attributes.iter().map(|f| f.to_string()).collect::<Vec<String>>().join(" "));
+        }
+        Command::SwitchLocal { system } => {
+            let system_attribute = match system {
+                Some(s) => s,
+                None => {
+                    let hostname = unistd::gethostname()
+                        .expect("Failed getting hostname")
+                        .into_string()
+                        .expect("Hostname is no valid UTF-8");
+                    &FlakeReference { 
+                        url: ".".to_string(),
+                        attribute: hostname
+                    }
+                }
+            };
+            println!("Switching system: {}", system_attribute);
+
+            let toplevel = nixlib::toplevel_output_path(system_attribute)?;
+            println!("Toplevel: {}", toplevel);
         }
     }
 

@@ -18,11 +18,17 @@ pub enum Command {
         #[arg(value_parser = nixlib::flakeref::parse_flake_reference)]
         systems: Vec<nixlib::FlakeReference>,
     },
-    /// Switch systems
-    Switch {
+    /// Switch remote systems
+    SwitchRemote {
         /// Systems to switch
         #[arg(value_parser = nixlib::flakeref::parse_flake_reference)]
         systems: Vec<nixlib::FlakeReference>,
+    },
+    /// Switch systems
+    SwitchLocal {
+        /// System attribute to switch to
+        #[arg(value_parser = nixlib::flakeref::parse_flake_reference)]
+        system: Option<nixlib::FlakeReference>,
     },
 }
 
