@@ -15,25 +15,27 @@ fn main() -> Result<()> {
 
     match &cli.command {
         Command::Build { systems } => {
-            if systems.is_empty() {
-                println!("Building default system...");
+            let system_attributes : Vec<FlakeReference> = if systems.is_empty() {
+                nixlib::nixos_configuration_flakerefs(".")?
             } else {
-                println!("Building systems: {:?}", systems);
-            }
+                systems.clone()
+            };
+            println!("systems: {}", system_attributes.iter().map(|f| f.to_string()).collect::<Vec<String>>().join(" "));
         }
         Command::Switch { systems } => {
             if systems.is_empty() {
                 println!("Switching to default system...");
             } else {
-                println!("Switching to systems: {:?}", systems);
+                println!("Switching to systems: {systems:?}");
             }
         }
     }
 
+    /*
     println!("output: {:?}", nixlib::nixos_configuration_attributes("."));
     println!("output: {:?}", nixlib::nixos_fqdn(&FlakeReference{ flake_path: ".".to_string(), attribute: "marketing".to_string() }));
     println!("output: {:?}", nixlib::toplevel_output_path(&FlakeReference{ flake_path: ".".to_string(), attribute: "marketing".to_string() }));
-
+ */
 
     Ok(())
 }

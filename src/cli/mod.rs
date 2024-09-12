@@ -1,7 +1,6 @@
 use clap::{Parser, Subcommand};
 
 use crate::nixlib;
-use crate::nixlib::FlakeReference;
 
 /// CLI tool to manage systems
 #[derive(Parser, Debug)]
@@ -17,13 +16,13 @@ pub enum Command {
     Build {
         /// Systems to build
         #[arg(value_parser = nixlib::flakeref::parse_flake_reference)]
-        systems: Vec<FlakeReference>,
+        systems: Vec<nixlib::FlakeReference>,
     },
     /// Switch systems
     Switch {
         /// Systems to switch
         #[arg(value_parser = nixlib::flakeref::parse_flake_reference)]
-        systems: Vec<FlakeReference>,
+        systems: Vec<nixlib::FlakeReference>,
     },
 }
 

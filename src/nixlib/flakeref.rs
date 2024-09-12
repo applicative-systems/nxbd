@@ -3,7 +3,7 @@ use std::fmt;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct FlakeReference {
-    pub flake_path: String,
+    pub url: String,
     pub attribute: String,
 }
 
@@ -21,19 +21,19 @@ impl FromStr for FlakeReference {
         match parts.len() {
             0 => {
                 Ok(FlakeReference {
-                    flake_path: String::new(),
+                    url: String::new(),
                     attribute: String::new(),
                 })
             }
             1 => {
                 Ok(FlakeReference {
-                    flake_path: String::new(),
+                    url: String::new(),
                     attribute: parts[0].to_string(),
                 })
             }
             2 => {
                 Ok(FlakeReference {
-                    flake_path: parts[0].to_string(),
+                    url: parts[0].to_string(),
                     attribute: parts[1].to_string(),
                 })
             }
@@ -42,7 +42,13 @@ impl FromStr for FlakeReference {
     }
 }
 
-/// Implementing Display for ParseError to enable formatted error messages.
+
+impl fmt::Display for FlakeReference {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}#{}", self.url, self.attribute)
+    }
+}
+
 impl fmt::Display for ParseError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
@@ -51,7 +57,6 @@ impl fmt::Display for ParseError {
     }
 }
 
-/// Custom value parser to parse flake references from strings
 pub fn parse_flake_reference(s: &str) -> Result<FlakeReference, String> {
     FlakeReference::from_str(s).map_err(|e| e.to_string())
 }
@@ -65,7 +70,7 @@ mod tests {
     fn test_empty_string() {
         let parsed = FlakeReference::from_str("");
         let expected = Ok(FlakeReference {
-            flake_path: "".to_string(),
+            url: "".to_string(),
             attribute: "".to_string(),
         });
         assert_eq!(parsed, expected);
@@ -75,7 +80,7 @@ mod tests {
     fn test_no_flake_path() {
         let parsed = FlakeReference::from_str("bla");
         let expected = Ok(FlakeReference {
-            flake_path: "".to_string(),
+            url: "".to_string(),
             attribute: "bla".to_string(),
         });
         assert_eq!(parsed, expected);
@@ -85,7 +90,7 @@ mod tests {
     fn test_with_flake_path() {
         let parsed = FlakeReference::from_str("foo#bar");
         let expected = Ok(FlakeReference {
-            flake_path: "foo".to_string(),
+            url: "foo".to_string(),
             attribute: "bar".to_string(),
         });
         assert_eq!(parsed, expected);
@@ -95,7 +100,7 @@ mod tests {
     fn test_empty_flake_path_with_attribute() {
         let parsed = FlakeReference::from_str("#bar");
         let expected = Ok(FlakeReference {
-            flake_path: "".to_string(),
+            url: "".to_string(),
             attribute: "bar".to_string(),
         });
         assert_eq!(parsed, expected);
@@ -105,7 +110,7 @@ mod tests {
     fn test_flake_path_with_empty_attribute() {
         let parsed = FlakeReference::from_str("foo#");
         let expected = Ok(FlakeReference {
-            flake_path: "foo".to_string(),
+            url: "foo".to_string(),
             attribute: "".to_string(),
         });
         assert_eq!(parsed, expected);

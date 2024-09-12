@@ -26,12 +26,24 @@ pub fn nixos_configuration_attributes(flake_url: &str) -> Result<Vec<String>> {
     Ok(deserialized_vec)
 }
 
+pub fn nixos_configuration_flakerefs(flake_url: &str) -> Result<Vec<FlakeReference>> {
+    let discovered_attrs = nixos_configuration_attributes(flake_url)?;
+    let flakerefs = discovered_attrs
+        .into_iter()
+        .map(|x| FlakeReference{ 
+            url: flake_url.to_string(), 
+            attribute: x 
+        })
+        .collect();
+    Ok(flakerefs)
+}
+
 pub fn nixos_fqdn(flake_reference: &FlakeReference) -> Result<String> {
     let build_output = process::Command::new("nix")
         .args([
             "eval",
             "--raw",
-            &format!("{0}#nixosConfigurations.\"{1}\".config.networking.fqdn", flake_reference.flake_path, flake_reference.attribute),
+            &format!("{0}#nixosConfigurations.\"{1}\".config.networking.fqdn", flake_reference.url, flake_reference.attribute),
         ])
         .stderr(process::Stdio::inherit())
         .output()?;
@@ -49,7 +61,7 @@ pub fn toplevel_output_path(flake_reference: &FlakeReference) -> Result<String> 
         .args([
             "build",
             "--print-out-paths",
-            &format!("{0}#nixosConfigurations.\"{1}\".config.system.build.toplevel", flake_reference.flake_path, flake_reference.attribute),
+            &format!("{0}#nixosConfigurations.\"{1}\".config.system.build.toplevel", flake_reference.url, flake_reference.attribute),
         ])
         .stderr(process::Stdio::inherit())
         .output()?;
