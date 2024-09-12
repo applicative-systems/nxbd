@@ -47,7 +47,9 @@ fn main() -> Result<()> {
             println!("Switching system: {}", system_attribute);
 
             let toplevel = nixlib::toplevel_output_path(system_attribute)?;
-            println!("Toplevel: {}", toplevel);
+            println!("Store path is [{}]", toplevel);
+            nixlib::activate_profile(&toplevel)?;
+            nixlib::switch_to_configuration(&toplevel, "switch")?;
         }
     }
 
