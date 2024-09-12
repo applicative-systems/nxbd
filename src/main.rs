@@ -8,6 +8,14 @@ use nixlib::FlakeReference;
 
 use crate::cli::{Cli, Command};
 
+fn flakerefs_or_default(refs: &Vec<FlakeReference>) -> Result<Vec<FlakeReference>> {
+    if refs.is_empty() {
+        nixlib::nixos_configuration_flakerefs(".")
+    } else {
+        Ok(refs.clone())
+    }
+}
+
 fn main() -> Result<()> {
     color_eyre::install()?;
 
@@ -15,19 +23,12 @@ fn main() -> Result<()> {
 
     match &cli.command {
         Command::Build { systems } => {
-            let system_attributes : Vec<FlakeReference> = if systems.is_empty() {
-                nixlib::nixos_configuration_flakerefs(".")?
-            } else {
-                systems.clone()
-            };
-            println!("systems: {}", system_attributes.iter().map(|f| f.to_string()).collect::<Vec<String>>().join(" "));
+            let system_attributes = flakerefs_or_default(systems)?;
+            println!("Building systems: {}", system_attributes.iter().map(|f| f.to_string()).collect::<Vec<String>>().join(" "));
         }
         Command::Switch { systems } => {
-            if systems.is_empty() {
-                println!("Switching to default system...");
-            } else {
-                println!("Switching to systems: {systems:?}");
-            }
+            let system_attributes = flakerefs_or_default(systems)?;
+            println!("Switching systems: {}", system_attributes.iter().map(|f| f.to_string()).collect::<Vec<String>>().join(" "));
         }
     }
 
