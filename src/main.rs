@@ -2,12 +2,11 @@ mod cli;
 mod nixlib;
 
 use clap::Parser;
-use eyre::{Result, bail};
 use nixlib::FlakeReference;
 use crate::cli::{Cli, Command};
 use nix::unistd;
 
-fn flakerefs_or_default(refs: &Vec<FlakeReference>) -> Result<Vec<FlakeReference>> {
+fn flakerefs_or_default(refs: &Vec<FlakeReference>) -> Result<Vec<FlakeReference>, nixlib::NixError> {
     if refs.is_empty() {
         nixlib::nixos_configuration_flakerefs(".")
     } else {
@@ -15,9 +14,7 @@ fn flakerefs_or_default(refs: &Vec<FlakeReference>) -> Result<Vec<FlakeReference
     }
 }
 
-fn main() -> Result<()> {
-    color_eyre::install()?;
-
+fn main() -> Result<(), nixlib::NixError> {
     let cli = Cli::parse();
 
     match &cli.command {

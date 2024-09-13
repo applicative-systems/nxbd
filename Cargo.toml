@@ -13,9 +13,6 @@ keywords   = ["nix", "nixos", "system"]
 [dependencies]
 clap          = { version = "4.5.17", features = ["derive", "env", "string"] }
 clap_complete = "4.5.26"
-color-eyre    = "0.6.3"
-enum_dispatch = "0.3.13"
-eyre = "0.6.12"
 nix = { version = "0.29.0", features = ["process", "user", "hostname"] }
 owo-colors    = "4.1.0"
 serde         = { version = "1.0.210", features = ["derive"] }
