@@ -6,11 +6,11 @@ use nixlib::FlakeReference;
 use crate::cli::{Cli, Command};
 use nix::unistd;
 
-fn flakerefs_or_default(refs: &Vec<FlakeReference>) -> Result<Vec<FlakeReference>, nixlib::NixError> {
+fn flakerefs_or_default(refs: &[FlakeReference]) -> Result<Vec<FlakeReference>, nixlib::NixError> {
     if refs.is_empty() {
         nixlib::nixos_configuration_flakerefs(".")
     } else {
-        Ok(refs.clone())
+        Ok(refs.to_owned())
     }
 }
 
@@ -41,10 +41,10 @@ fn main() -> Result<(), nixlib::NixError> {
                     }
                 }
             };
-            println!("Switching system: {}", system_attribute);
+            println!("Switching system: {system_attribute}");
 
             let toplevel = nixlib::toplevel_output_path(system_attribute)?;
-            println!("Store path is [{}]", toplevel);
+            println!("Store path is [{toplevel}]");
             nixlib::activate_profile(&toplevel)?;
             nixlib::switch_to_configuration(&toplevel, "switch")?;
         }

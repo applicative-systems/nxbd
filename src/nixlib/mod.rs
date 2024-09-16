@@ -8,11 +8,11 @@ pub use flakeref::FlakeReference;
 
 #[derive(Debug)]
 pub enum NixError {
-    EvalError,
-    BuildError,
-    ConfigSwitchError,
-    ProfileSetError,
-    DeserializationError,
+    Eval,
+    Build,
+    ConfigSwitch,
+    ProfileSet,
+    Deserialization,
 }
 
 pub fn nixos_configuration_attributes(flake_url: &str) -> Result<Vec<String>, NixError> {
@@ -26,11 +26,11 @@ pub fn nixos_configuration_attributes(flake_url: &str) -> Result<Vec<String>, Ni
         ])
         .stderr(process::Stdio::inherit())
         .output()
-        .map_err(|_| NixError::EvalError)?;
+        .map_err(|_| NixError::Eval)?;
 
     let stdout_str = str::from_utf8(&build_output.stdout).expect("Failed to convert to string");
     let attributes: Vec<String> = serde_json::from_str(stdout_str)
-        .map_err(|_| NixError::DeserializationError)?;
+        .map_err(|_| NixError::Deserialization)?;
 
     Ok(attributes)
 }
@@ -56,7 +56,7 @@ pub fn nixos_fqdn(flake_reference: &FlakeReference) -> Result<String, NixError> 
         ])
         .stderr(process::Stdio::inherit())
         .output()
-        .map_err(|_| NixError::EvalError)?;
+        .map_err(|_| NixError::Eval)?;
 
     let stdout_str = str::from_utf8(&build_output.stdout).expect("Failed to convert to string");
     Ok(stdout_str.to_string())
@@ -73,10 +73,10 @@ pub fn toplevel_output_path(flake_reference: &FlakeReference) -> Result<String, 
         ])
         .stderr(process::Stdio::inherit())
         .output()
-        .map_err(|_| NixError::BuildError)?;
+        .map_err(|_| NixError::Build)?;
 
     let output_path = outputhandling::single_nix_build_output(&build_output.stdout)
-        .map_err(|_| NixError::DeserializationError)?;
+        .map_err(|_| NixError::Deserialization)?;
     Ok(output_path)
 }
 
@@ -91,7 +91,7 @@ pub fn activate_profile(toplevel_path: &str) -> Result<(), NixError> {
         ])
         .stderr(process::Stdio::inherit())
         .output()
-        .map_err(|_| NixError::ProfileSetError)
+        .map_err(|_| NixError::ProfileSet)
         .map(|_| ())
 }
 
@@ -103,6 +103,6 @@ pub fn switch_to_configuration(toplevel_path: &str, command: &str) -> Result<(),
         ])
         .stderr(process::Stdio::inherit())
         .output()
-        .map_err(|_| NixError::ConfigSwitchError)
+        .map_err(|_| NixError::ConfigSwitch)
         .map(|_| ())
 }

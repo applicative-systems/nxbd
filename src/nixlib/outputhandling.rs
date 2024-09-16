@@ -14,7 +14,7 @@ struct BuildOutput {
     outputs: HashMap<String, String>,
 }
 
-pub fn single_nix_build_output(stdout: &Vec<u8>) -> Result<String, OutputError> {
+pub fn single_nix_build_output(stdout: &[u8]) -> Result<String, OutputError> {
     let stdout_str = str::from_utf8(stdout).expect("Failed to convert to string");
     let build_outputs: Vec<BuildOutput> = serde_json::from_str(stdout_str)
         .map_err(|_| OutputError::DeserializationError)?;
