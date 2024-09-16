@@ -1,8 +1,8 @@
 pub mod flakeref;
+mod outputhandling;
+
 use std::process;
 use std::str;
-use serde::Deserialize;
-use std::collections::HashMap;
 
 pub use flakeref::FlakeReference;
 
@@ -10,8 +10,6 @@ pub use flakeref::FlakeReference;
 pub enum NixError {
     EvalError,
     BuildError,
-    MultipleOutputPaths,
-    NoOutputPath,
     ConfigSwitchError,
     ProfileSetError,
     DeserializationError,
@@ -31,9 +29,10 @@ pub fn nixos_configuration_attributes(flake_url: &str) -> Result<Vec<String>, Ni
         .map_err(|_| NixError::EvalError)?;
 
     let stdout_str = str::from_utf8(&build_output.stdout).expect("Failed to convert to string");
-    let deserialized_vec: Vec<String> = serde_json::from_str(stdout_str)
+    let attributes: Vec<String> = serde_json::from_str(stdout_str)
         .map_err(|_| NixError::DeserializationError)?;
-    Ok(deserialized_vec)
+
+    Ok(attributes)
 }
 
 pub fn nixos_configuration_flakerefs(flake_url: &str) -> Result<Vec<FlakeReference>, NixError> {
@@ -63,11 +62,7 @@ pub fn nixos_fqdn(flake_reference: &FlakeReference) -> Result<String, NixError> 
     Ok(stdout_str.to_string())
 }
 
-#[derive(Debug, Deserialize)]
-struct BuildOutput {
-    drvPath: String,
-    outputs: HashMap<String, String>,
-}
+
 
 pub fn toplevel_output_path(flake_reference: &FlakeReference) -> Result<String, NixError> {
     let build_output = process::Command::new("nom")
@@ -80,18 +75,9 @@ pub fn toplevel_output_path(flake_reference: &FlakeReference) -> Result<String, 
         .output()
         .map_err(|_| NixError::BuildError)?;
 
-    let stdout_str = str::from_utf8(&build_output.stdout).expect("Failed to convert to string");
-    let build_outputs: Vec<BuildOutput> = serde_json::from_str(stdout_str)
+    let output_path = outputhandling::single_nix_build_output(&build_output.stdout)
         .map_err(|_| NixError::DeserializationError)?;
-
-    if build_outputs.len() != 1 {
-        return Err(NixError::MultipleOutputPaths);
-    }
-
-    match build_outputs[0].outputs.get("out") {
-        Some(out) => Ok(out.clone()),
-        None => Err(NixError::NoOutputPath)
-    }
+    Ok(output_path)
 }
 
 pub fn activate_profile(toplevel_path: &str) -> Result<(), NixError> {
