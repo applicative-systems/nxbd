@@ -2,7 +2,7 @@ mod cli;
 mod nixlib;
 
 use clap::Parser;
-use nixlib::FlakeReference;
+use nixlib::{deployinfo::{acquire_deploy_info, DeployInfo}, FlakeReference};
 use crate::cli::{Cli, Command};
 use nix::unistd;
 
@@ -26,6 +26,12 @@ fn main() -> Result<(), nixlib::NixError> {
         Command::SwitchRemote { systems } => {
             let system_attributes = flakerefs_or_default(systems)?;
             println!("Switching systems: {}", system_attributes.iter().map(|f| f.to_string()).collect::<Vec<String>>().join(" "));
+
+            let deploy_infos: Result<Vec<DeployInfo>, _> = system_attributes
+                .iter()
+                .map(acquire_deploy_info)
+                .collect();
+            println!("Infos: {deploy_infos:?}");
         }
         Command::SwitchLocal { system } => {
             let system_attribute = match system {
