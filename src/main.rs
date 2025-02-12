@@ -2,7 +2,7 @@ mod cli;
 mod nixlib;
 
 use clap::Parser;
-use nixlib::{deployinfo::{acquire_deploy_info, DeployInfo}, FlakeReference};
+use nixlib::{deployinfo::{nixos_deploy_info, ConfigInfo}, FlakeReference};
 use crate::cli::{Cli, Command};
 use nix::unistd;
 
@@ -27,9 +27,9 @@ fn main() -> Result<(), nixlib::NixError> {
             let system_attributes = flakerefs_or_default(systems)?;
             println!("Switching systems: {}", system_attributes.iter().map(|f| f.to_string()).collect::<Vec<String>>().join(" "));
 
-            let deploy_infos: Result<Vec<DeployInfo>, _> = system_attributes
+            let deploy_infos: Result<Vec<_>, _> = system_attributes
                 .iter()
-                .map(acquire_deploy_info)
+                .map(nixos_deploy_info)
                 .collect();
             println!("Infos: {deploy_infos:?}");
         }
