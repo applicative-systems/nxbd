@@ -8,6 +8,7 @@ use std::str;
 
 #[derive(Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
+#[allow(dead_code)] // the deserialization code actually touches all fields
 pub struct ConfigInfo {
     // The machine's host name
     pub hostname: Option<String>,
@@ -77,11 +78,7 @@ pub fn nixos_deploy_info(flake_reference: &FlakeReference) -> Result<ConfigInfo,
     let stdout_str = str::from_utf8(&build_output.stdout).expect("Failed to convert to string");
     //println!("stdout_str = {:?}", stdout_str);
 
-    let x = nixos_deploy_ssh_keys(flake_reference, "tfc");
-    //println!("deserialized = {:?}", x);
-
     let deserialized: ConfigInfo = serde_json::from_str(&stdout_str).unwrap();
-    //println!("deserialized = {:?}", deserialized);
     Ok(deserialized)
 }
 

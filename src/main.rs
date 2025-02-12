@@ -20,8 +20,12 @@ fn main() -> Result<(), nixlib::NixError> {
     match &cli.command {
         Command::Build { systems } => {
             let system_attributes = flakerefs_or_default(systems)?;
-            println!("Building systems: {}", system_attributes.iter().map(|f| f.to_string()).collect::<Vec<String>>().join(" "));
-
+            println!("Building systems: {}", system_attributes.iter().map(|f| 
+                f.to_string()).collect::<Vec<String>>().join(" "));
+            for system in &system_attributes {
+                let toplevel = nixlib::toplevel_output_path(system)?;
+                println!("Built store path for {}: [{}]", system, toplevel);
+            }
         }
         Command::SwitchRemote { systems } => {
             let system_attributes = flakerefs_or_default(systems)?;
