@@ -14,6 +14,8 @@ pub struct ConfigInfo {
     pub hostname: Option<String>,
     // The machine's fully qualified domain name
     pub fqdn: Option<String>,
+    // The machine's fully qualified domain name or host name
+    pub fqdn_or_host_name: Option<String>,
     // Whether the wheel user needs a password to sudo
     pub wheel_needs_password: bool,
     // Whether SSH is enabled
@@ -35,6 +37,7 @@ in
 {{
   hostname = f config.networking.hostName;
   fqdn = f config.networking.fqdn;
+  fqdnOrHostName = f config.networking.fqdnOrHostName;
   wheelNeedsPassword = config.security.sudo.wheelNeedsPassword;
   sshEnabled = config.services.openssh.enable;
   sudoEnabled = config.security.sudo.enable;
