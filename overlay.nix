@@ -1,3 +1,3 @@
-final: prev: {
-  nxbd = prev.callPackage ./package.nix {};
+_final: prev: {
+  nxbd = prev.callPackage ./package.nix { };
 }
