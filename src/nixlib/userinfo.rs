@@ -1,5 +1,5 @@
-use std::path::PathBuf;
 use std::fs;
+use std::path::PathBuf;
 use std::process::Command;
 
 #[derive(Debug)]
@@ -18,7 +18,7 @@ pub struct UserInfo {
 impl UserInfo {
     pub fn collect() -> Self {
         let username = std::env::var("USER").unwrap_or_else(|_| "unknown".to_string());
-        
+
         let ssh_keys = Command::new("ssh-add")
             .arg("-L")
             .output()
@@ -47,9 +47,6 @@ impl UserInfo {
             })
             .unwrap_or_else(Vec::new);
 
-        UserInfo {
-            username,
-            ssh_keys,
-        }
+        UserInfo { username, ssh_keys }
     }
-} 
+}
