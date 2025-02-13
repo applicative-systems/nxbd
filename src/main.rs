@@ -1,10 +1,13 @@
 mod cli;
 mod nixlib;
 
-use clap::Parser;
-use nixlib::{deployinfo::{nixos_deploy_info, ConfigInfo}, FlakeReference};
 use crate::cli::{Cli, Command};
+use clap::Parser;
 use nix::unistd;
+use nixlib::{
+    deployinfo::{nixos_deploy_info, ConfigInfo},
+    FlakeReference,
+};
 
 fn flakerefs_or_default(refs: &[FlakeReference]) -> Result<Vec<FlakeReference>, nixlib::NixError> {
     if refs.is_empty() {
@@ -28,8 +31,14 @@ fn main() -> Result<(), nixlib::NixError> {
     match &cli.command {
         Command::Build { systems } => {
             let system_attributes = flakerefs_or_default(systems)?;
-            println!("Building systems: {}", system_attributes.iter().map(|f| 
-                f.to_string()).collect::<Vec<String>>().join(" "));
+            println!(
+                "Building systems: {}",
+                system_attributes
+                    .iter()
+                    .map(|f| f.to_string())
+                    .collect::<Vec<String>>()
+                    .join(" ")
+            );
             for system in &system_attributes {
                 let toplevel = nixlib::toplevel_output_path(system)?;
                 println!("Built store path for {}: [{}]", system, toplevel);
@@ -37,7 +46,14 @@ fn main() -> Result<(), nixlib::NixError> {
         }
         Command::SwitchRemote { systems } => {
             let system_attributes = flakerefs_or_default(systems)?;
-            println!("Switching systems: {}", system_attributes.iter().map(|f| f.to_string()).collect::<Vec<String>>().join(" "));
+            println!(
+                "Switching systems: {}",
+                system_attributes
+                    .iter()
+                    .map(|f| f.to_string())
+                    .collect::<Vec<String>>()
+                    .join(" ")
+            );
 
             let deploy_infos: Result<Vec<_>, _> = system_attributes
                 .iter()
@@ -45,7 +61,7 @@ fn main() -> Result<(), nixlib::NixError> {
                     let deploy_info: ConfigInfo = nixos_deploy_info(sa)?;
                     match deploy_info.fqdn_or_host_name {
                         Some(host) => deploy_remote(sa, &host),
-                        None => Err(nixlib::NixError::NoHostName)
+                        None => Err(nixlib::NixError::NoHostName),
                     }
                 })
                 .collect();
@@ -59,9 +75,9 @@ fn main() -> Result<(), nixlib::NixError> {
                         .expect("Failed getting hostname")
                         .into_string()
                         .expect("Hostname is no valid UTF-8");
-                    &FlakeReference { 
+                    &FlakeReference {
                         url: ".".to_string(),
-                        attribute: hostname
+                        attribute: hostname,
                     }
                 }
             };
@@ -75,10 +91,10 @@ fn main() -> Result<(), nixlib::NixError> {
     }
 
     /*
-    println!("output: {:?}", nixlib::nixos_configuration_attributes("."));
-    println!("output: {:?}", nixlib::nixos_fqdn(&FlakeReference{ flake_path: ".".to_string(), attribute: "marketing".to_string() }));
-    println!("output: {:?}", nixlib::toplevel_output_path(&FlakeReference{ flake_path: ".".to_string(), attribute: "marketing".to_string() }));
- */
+       println!("output: {:?}", nixlib::nixos_configuration_attributes("."));
+       println!("output: {:?}", nixlib::nixos_fqdn(&FlakeReference{ flake_path: ".".to_string(), attribute: "marketing".to_string() }));
+       println!("output: {:?}", nixlib::toplevel_output_path(&FlakeReference{ flake_path: ".".to_string(), attribute: "marketing".to_string() }));
+    */
 
     Ok(())
 }

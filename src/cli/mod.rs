@@ -31,4 +31,3 @@ pub enum Command {
         system: Option<nixlib::FlakeReference>,
     },
 }
-

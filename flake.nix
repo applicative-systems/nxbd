@@ -32,6 +32,7 @@
             programs = {
               deadnix.enable = true;
               nixfmt.enable = true;
+              rustfmt.enable = true;
               statix.enable = true;
             };
           };

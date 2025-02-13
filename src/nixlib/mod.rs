@@ -1,5 +1,5 @@
-pub mod flakeref;
 pub mod deployinfo;
+pub mod flakeref;
 mod outputhandling;
 
 use std::process;
@@ -14,7 +14,7 @@ pub enum NixError {
     ConfigSwitch,
     ProfileSet,
     Deserialization,
-    NoHostName
+    NoHostName,
 }
 
 pub fn nixos_configuration_attributes(flake_url: &str) -> Result<Vec<String>, NixError> {
@@ -24,15 +24,15 @@ pub fn nixos_configuration_attributes(flake_url: &str) -> Result<Vec<String>, Ni
             "--json",
             &format!("{flake_url}#nixosConfigurations"),
             "--apply",
-            "builtins.attrNames"
+            "builtins.attrNames",
         ])
         .stderr(process::Stdio::inherit())
         .output()
         .map_err(|_| NixError::Eval)?;
 
     let stdout_str = str::from_utf8(&build_output.stdout).expect("Failed to convert to string");
-    let attributes: Vec<String> = serde_json::from_str(stdout_str)
-        .map_err(|_| NixError::Deserialization)?;
+    let attributes: Vec<String> =
+        serde_json::from_str(stdout_str).map_err(|_| NixError::Deserialization)?;
 
     Ok(attributes)
 }
@@ -41,9 +41,9 @@ pub fn nixos_configuration_flakerefs(flake_url: &str) -> Result<Vec<FlakeReferen
     let discovered_attrs = nixos_configuration_attributes(flake_url)?;
     let flakerefs = discovered_attrs
         .into_iter()
-        .map(|x| FlakeReference{ 
-            url: flake_url.to_string(), 
-            attribute: x 
+        .map(|x| FlakeReference {
+            url: flake_url.to_string(),
+            attribute: x,
         })
         .collect();
     Ok(flakerefs)
@@ -54,7 +54,10 @@ pub fn toplevel_output_path(flake_reference: &FlakeReference) -> Result<String, 
         .args([
             "build",
             "--json",
-            &format!("{0}#nixosConfigurations.\"{1}\".config.system.build.toplevel", flake_reference.url, flake_reference.attribute),
+            &format!(
+                "{0}#nixosConfigurations.\"{1}\".config.system.build.toplevel",
+                flake_reference.url, flake_reference.attribute
+            ),
         ])
         .stderr(process::Stdio::inherit())
         .output()
@@ -65,13 +68,17 @@ pub fn toplevel_output_path(flake_reference: &FlakeReference) -> Result<String, 
     Ok(output_path)
 }
 
-pub fn activate_profile(toplevel_path: &str, use_sudo: bool, remote_host: Option<&str>) -> Result<(), NixError> {
+pub fn activate_profile(
+    toplevel_path: &str,
+    use_sudo: bool,
+    remote_host: Option<&str>,
+) -> Result<(), NixError> {
     let mut command_vec = Vec::new();
-    
+
     if let Some(host) = remote_host {
         command_vec.push("ssh");
         command_vec.push(host);
-    } 
+    }
     if use_sudo {
         command_vec.push("sudo");
     }
@@ -81,11 +88,10 @@ pub fn activate_profile(toplevel_path: &str, use_sudo: bool, remote_host: Option
         "-p",
         "/nix/var/nix/profiles/system",
         "--set",
-        toplevel_path
+        toplevel_path,
     ]);
 
-    let (cmd, args) = command_vec.split_first()
-        .ok_or(NixError::ProfileSet)?;
+    let (cmd, args) = command_vec.split_first().ok_or(NixError::ProfileSet)?;
 
     process::Command::new(cmd)
         .args(args)
@@ -95,9 +101,14 @@ pub fn activate_profile(toplevel_path: &str, use_sudo: bool, remote_host: Option
         .map(|_| ())
 }
 
-pub fn switch_to_configuration(toplevel_path: &str, command: &str, use_sudo: bool, remote_host: Option<&str>) -> Result<(),NixError> {
+pub fn switch_to_configuration(
+    toplevel_path: &str,
+    command: &str,
+    use_sudo: bool,
+    remote_host: Option<&str>,
+) -> Result<(), NixError> {
     let mut command_vec = Vec::new();
-    
+
     if let Some(host) = remote_host {
         command_vec.push("ssh");
         command_vec.push(host);
@@ -107,13 +118,9 @@ pub fn switch_to_configuration(toplevel_path: &str, command: &str, use_sudo: boo
     }
 
     let switch_path = format!("{toplevel_path}/bin/switch-to-configuration");
-    command_vec.extend(vec![
-        &switch_path,
-        command
-    ]);
+    command_vec.extend(vec![&switch_path, command]);
 
-    let (cmd, args) = command_vec.split_first()
-        .ok_or(NixError::ConfigSwitch)?;
+    let (cmd, args) = command_vec.split_first().ok_or(NixError::ConfigSwitch)?;
 
     process::Command::new(cmd)
         .args(args)
@@ -126,12 +133,7 @@ pub fn switch_to_configuration(toplevel_path: &str, command: &str, use_sudo: boo
 pub fn copy_to_host(toplevel_path: &str, host: &str) -> Result<(), NixError> {
     let target = format!("ssh://{}", host);
     process::Command::new("nix")
-        .args([
-            "copy",
-            "--to",
-            &target,
-            toplevel_path,
-        ])
+        .args(["copy", "--to", &target, toplevel_path])
         .stderr(process::Stdio::inherit())
         .output()
         .map_err(|_| NixError::ConfigSwitch)

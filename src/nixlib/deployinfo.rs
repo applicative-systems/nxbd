@@ -21,7 +21,7 @@ pub struct ConfigInfo {
     // Whether sudo is enabled
     pub sudo_enabled: bool,
     // Whether the nix user trusts the wheel group
-    pub nix_trusts_wheel: bool
+    pub nix_trusts_wheel: bool,
 }
 
 fn config_info_nix_expression(system_name: &str, flake: &str) -> String {
@@ -83,7 +83,10 @@ pub fn nixos_deploy_info(flake_reference: &FlakeReference) -> Result<ConfigInfo,
     Ok(deserialized)
 }
 
-pub fn nixos_deploy_ssh_keys(flake_reference: &FlakeReference, user: &str) -> Result<Vec<String>, NixError> {
+pub fn nixos_deploy_ssh_keys(
+    flake_reference: &FlakeReference,
+    user: &str,
+) -> Result<Vec<String>, NixError> {
     let build_output: process::Output = process::Command::new("nix")
         .args([
             "eval",

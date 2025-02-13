@@ -1,5 +1,5 @@
-use std::str::FromStr;
 use std::fmt;
+use std::str::FromStr;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct FlakeReference {
@@ -19,29 +19,22 @@ impl FromStr for FlakeReference {
         let parts: Vec<&str> = input.split('#').collect();
 
         match parts.len() {
-            0 => {
-                Ok(FlakeReference {
-                    url: String::new(),
-                    attribute: String::new(),
-                })
-            }
-            1 => {
-                Ok(FlakeReference {
-                    url: String::new(),
-                    attribute: parts[0].to_string(),
-                })
-            }
-            2 => {
-                Ok(FlakeReference {
-                    url: parts[0].to_string(),
-                    attribute: parts[1].to_string(),
-                })
-            }
+            0 => Ok(FlakeReference {
+                url: String::new(),
+                attribute: String::new(),
+            }),
+            1 => Ok(FlakeReference {
+                url: String::new(),
+                attribute: parts[0].to_string(),
+            }),
+            2 => Ok(FlakeReference {
+                url: parts[0].to_string(),
+                attribute: parts[1].to_string(),
+            }),
             _ => Err(ParseError::MultipleHashSigns),
         }
     }
 }
-
 
 impl fmt::Display for FlakeReference {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
