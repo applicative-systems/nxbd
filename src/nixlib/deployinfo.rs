@@ -22,86 +22,80 @@ pub struct ConfigInfo {
     pub sudo_enabled: bool,
     // Whether the nix user trusts the wheel group
     pub nix_trusts_wheel: bool,
+    // Users with their SSH keys
+    pub users: Vec<NixUser>,
 }
 
-fn config_info_nix_expression(system_name: &str, flake: &str) -> String {
-    format!(
-        r#"let
-  flake = builtins.getFlake "{flake}";
-  systemName = "{system_name}";
-  inherit (flake.nixosConfigurations.${{systemName}}) config;
-  f = expr: let x = builtins.tryEval expr; in if x.success then x.value else null;
-in
-{{
-  hostname = f config.networking.hostName;
-  fqdn = f config.networking.fqdn;
-  fqdnOrHostName = f config.networking.fqdnOrHostName;
-  wheelNeedsPassword = config.security.sudo.wheelNeedsPassword;
-  sshEnabled = config.services.openssh.enable;
-  sudoEnabled = config.security.sudo.enable;
-  nixTrustsWheel = builtins.elem "@wheel" config.nix.settings.trusted-users;
-}}"#,
-        flake = flake,
-        system_name = system_name
-    )
-}
-
-fn config_info_sshkeys(system_name: &str, flake: &str, user: &str) -> String {
-    format!(
-        r#"let
-  flake = builtins.getFlake "{flake}";
-  systemName = "{system_name}";
-  user = "{user}";
-  inherit (flake.nixosConfigurations.${{systemName}}) config;
-  f = alt: expr: let x = builtins.tryEval expr; in if x.success then x.value else alt;
-in
-f [] config.users.users.${{user}}.openssh.authorizedKeys.keys
-"#,
-        flake = flake,
-        system_name = system_name,
-        user = user
-    )
+#[derive(Deserialize, Debug)]
+struct NixUser {
+    pub name: String,
+    #[serde(default)]
+    pub group: String,
+    #[serde(default)]
+    pub extraGroups: Vec<String>,
+    #[serde(default)]
+    pub sshKeys: Vec<String>,
 }
 
 pub fn nixos_deploy_info(flake_reference: &FlakeReference) -> Result<ConfigInfo, NixError> {
-    let build_output: process::Output = process::Command::new("nix")
+    let nix_expr = r#"config:
+          let
+            f = expr: let x = builtins.tryEval expr; in if x.success then x.value else null;
+            normalUsers = builtins.filter
+                (user: (user.isNormalUser or false))
+                (builtins.attrValues config.users.users);
+          in
+            {
+                hostname = f config.networking.hostName;
+                fqdn = f config.networking.fqdn;
+                fqdnOrHostName = f config.networking.fqdnOrHostName;
+                wheelNeedsPassword = config.security.sudo.wheelNeedsPassword;
+                sshEnabled = config.services.openssh.enable;
+                sudoEnabled = config.security.sudo.enable;
+                nixTrustsWheel = builtins.elem "@wheel" config.nix.settings.trusted-users;
+                users = map (user: {
+                    name = user.name;
+                    group = user.group or "";
+                    extraGroups = user.extraGroups or [];
+                    sshKeys = user.openssh.authorizedKeys.keys or [];
+                }) normalUsers;
+            }"#;
+
+    let output = std::process::Command::new("nix")
         .args([
             "eval",
-            "--impure",
             "--json",
-            "--expr",
-            &config_info_nix_expression(&flake_reference.attribute, &flake_reference.url),
+            &format!(
+                "{}#nixosConfigurations.\"{}\".config",
+                flake_reference.url, flake_reference.attribute
+            ),
+            "--apply",
+            nix_expr,
         ])
-        .stderr(process::Stdio::inherit())
         .output()
         .map_err(|_| NixError::Eval)?;
 
-    let stdout_str = str::from_utf8(&build_output.stdout).expect("Failed to convert to string");
-    //println!("stdout_str = {:?}", stdout_str);
+    let stdout_str = str::from_utf8(&output.stdout).expect("Failed to convert to string");
 
-    let deserialized: ConfigInfo = serde_json::from_str(&stdout_str).unwrap();
-    Ok(deserialized)
+    serde_json::from_str(&stdout_str).map_err(|_| NixError::Deserialization)
 }
 
-pub fn nixos_deploy_ssh_keys(
-    flake_reference: &FlakeReference,
-    user: &str,
-) -> Result<Vec<String>, NixError> {
-    let build_output: process::Output = process::Command::new("nix")
-        .args([
-            "eval",
-            "--impure",
-            "--json",
-            "--expr",
-            &config_info_sshkeys(&flake_reference.attribute, &flake_reference.url, &user),
-        ])
-        .stderr(process::Stdio::inherit())
-        .output()
-        .map_err(|_| NixError::Eval)?;
-
-    let stdout_str = str::from_utf8(&build_output.stdout).expect("Failed to convert to string");
-
-    let deserialized: Vec<String> = serde_json::from_str(&stdout_str).unwrap();
-    //println!("deserialized = {:?}", deserialized);
-    Ok(deserialized)
+impl ConfigInfo {
+    pub fn get_users_with_ssh_keys(
+        &self,
+        _flake_reference: &FlakeReference,
+    ) -> Result<Vec<(String, bool, Vec<String>)>, NixError> {
+        Ok(self
+            .users
+            .iter()
+            .filter(|user| !user.sshKeys.is_empty())
+            .map(|user| {
+                (
+                    user.name.clone(),
+                    user.extraGroups.contains(&"wheel".to_string()),
+                    user.sshKeys.clone(),
+                )
+            })
+            .collect())
+    }
 }

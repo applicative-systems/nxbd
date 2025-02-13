@@ -89,17 +89,70 @@ fn main() -> Result<(), nixlib::NixError> {
             nixlib::activate_profile(&toplevel, true, None)?;
             nixlib::switch_to_configuration(&toplevel, "switch", true, None)?;
         }
-        Command::Info => {
-            let info = UserInfo::collect();
-            println!("Current user: {}", info.username);
-            println!("\nLoaded SSH keys:");
-            if info.ssh_keys.is_empty() {
+        Command::Info { systems } => {
+            // First show local SSH agent info
+            let agent_info = UserInfo::collect();
+            println!("Current user: {}", agent_info.username);
+            println!("\nLoaded SSH keys in agent:");
+            if agent_info.ssh_keys.is_empty() {
                 println!("  No SSH keys loaded in ssh-agent");
             } else {
-                for key in &info.ssh_keys {
+                for key in &agent_info.ssh_keys {
                     println!("\nType:    {}", key.key_type);
                     println!("Comment: {}", key.comment);
                     println!("Key:     {}", key.key_data);
+                }
+            }
+
+            // Then show system configurations
+            let system_attributes = flakerefs_or_default(systems)?;
+            println!("\nSystem Configurations:");
+
+            for system in &system_attributes {
+                println!("\n=== {} ===", system);
+                match nixos_deploy_info(system) {
+                    Ok(info) => {
+                        let hostname = info
+                            .fqdn_or_host_name
+                            .clone()
+                            .unwrap_or_else(|| "unknown".to_string());
+                        println!("Hostname: {}", hostname);
+                        println!(
+                            "SSH Service: {}",
+                            if info.ssh_enabled {
+                                "enabled"
+                            } else {
+                                "disabled"
+                            }
+                        );
+                        println!(
+                            "Wheel group sudo: {}",
+                            if info.wheel_needs_password {
+                                "requires password"
+                            } else {
+                                "passwordless"
+                            }
+                        );
+
+                        println!("\nUsers with SSH access:");
+                        match info.get_users_with_ssh_keys(system) {
+                            Ok(users) => {
+                                for (username, is_wheel, ssh_keys) in users {
+                                    println!(
+                                        "\n  User: {} {}",
+                                        username,
+                                        if is_wheel { "(wheel)" } else { "" }
+                                    );
+                                    println!("  Authorized keys:");
+                                    for key in ssh_keys {
+                                        println!("    {}", key);
+                                    }
+                                }
+                            }
+                            Err(e) => println!("Error getting user info: {:?}", e),
+                        }
+                    }
+                    Err(e) => println!("Error getting system info: {:?}", e),
                 }
             }
         }
