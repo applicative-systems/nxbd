@@ -65,15 +65,38 @@ pub fn toplevel_output_path(flake_reference: &FlakeReference) -> Result<String, 
     Ok(output_path)
 }
 
-pub fn activate_profile(toplevel_path: &str) -> Result<(), NixError> {
-    process::Command::new("sudo")
-        .args([
-            "nix-env",
-            "-p",
-            "/nix/var/nix/profiles/system",
-            "--set",
-            toplevel_path
-        ])
+pub fn activate_profile(toplevel_path: &str, use_sudo: bool, remote_host: Option<&str>) -> Result<(), NixError> {
+    let mut command_vec = Vec::new();
+    
+    // Build the command vector from the innermost command outward
+    let nix_env_args = vec![
+        "nix-env",
+        "-p",
+        "/nix/var/nix/profiles/system",
+        "--set",
+        toplevel_path
+    ];
+
+    if let Some(host) = remote_host {
+        command_vec.push("ssh");
+        command_vec.push(host);
+        if use_sudo {
+            command_vec.push("sudo");
+        }
+        command_vec.extend(nix_env_args);
+    } else {
+        if use_sudo {
+            command_vec.push("sudo");
+        }
+        command_vec.extend(nix_env_args);
+    }
+
+    // Split into command and arguments
+    let (cmd, args) = command_vec.split_first()
+        .ok_or(NixError::ProfileSet)?;
+
+    process::Command::new(cmd)
+        .args(args)
         .stderr(process::Stdio::inherit())
         .output()
         .map_err(|_| NixError::ProfileSet)

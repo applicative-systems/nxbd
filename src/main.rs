@@ -17,7 +17,8 @@ fn flakerefs_or_default(refs: &[FlakeReference]) -> Result<Vec<FlakeReference>, 
 fn deploy_remote(system_attribute: &FlakeReference, host: &str) -> Result<(), nixlib::NixError> {
     let toplevel = nixlib::toplevel_output_path(system_attribute)?;
     println!("Built store path for {}: [{}]", system_attribute, toplevel);
-    nixlib::copy_to_host(&toplevel, host)
+    nixlib::copy_to_host(&toplevel, host)?;
+    nixlib::activate_profile(&toplevel, true, Some(host))
 }
 
 fn main() -> Result<(), nixlib::NixError> {
@@ -67,7 +68,7 @@ fn main() -> Result<(), nixlib::NixError> {
 
             let toplevel = nixlib::toplevel_output_path(system_attribute)?;
             println!("Store path is [{toplevel}]");
-            nixlib::activate_profile(&toplevel)?;
+            nixlib::activate_profile(&toplevel, false, None)?;
             nixlib::switch_to_configuration(&toplevel, "switch")?;
         }
     }
