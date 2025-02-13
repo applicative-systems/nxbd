@@ -68,30 +68,22 @@ pub fn toplevel_output_path(flake_reference: &FlakeReference) -> Result<String, 
 pub fn activate_profile(toplevel_path: &str, use_sudo: bool, remote_host: Option<&str>) -> Result<(), NixError> {
     let mut command_vec = Vec::new();
     
-    // Build the command vector from the innermost command outward
-    let nix_env_args = vec![
+    if let Some(host) = remote_host {
+        command_vec.push("ssh");
+        command_vec.push(host);
+    } 
+    if use_sudo {
+        command_vec.push("sudo");
+    }
+
+    command_vec.extend(vec![
         "nix-env",
         "-p",
         "/nix/var/nix/profiles/system",
         "--set",
         toplevel_path
-    ];
+    ]);
 
-    if let Some(host) = remote_host {
-        command_vec.push("ssh");
-        command_vec.push(host);
-        if use_sudo {
-            command_vec.push("sudo");
-        }
-        command_vec.extend(nix_env_args);
-    } else {
-        if use_sudo {
-            command_vec.push("sudo");
-        }
-        command_vec.extend(nix_env_args);
-    }
-
-    // Split into command and arguments
     let (cmd, args) = command_vec.split_first()
         .ok_or(NixError::ProfileSet)?;
 
@@ -103,12 +95,28 @@ pub fn activate_profile(toplevel_path: &str, use_sudo: bool, remote_host: Option
         .map(|_| ())
 }
 
-pub fn switch_to_configuration(toplevel_path: &str, command: &str) -> Result<(),NixError> {
-    process::Command::new("sudo")
-        .args([
-            &format!("{toplevel_path}/bin/switch-to-configuration"),
-            command
-        ])
+pub fn switch_to_configuration(toplevel_path: &str, command: &str, use_sudo: bool, remote_host: Option<&str>) -> Result<(),NixError> {
+    let mut command_vec = Vec::new();
+    
+    if let Some(host) = remote_host {
+        command_vec.push("ssh");
+        command_vec.push(host);
+    }
+    if use_sudo {
+        command_vec.push("sudo");
+    }
+
+    let switch_path = format!("{toplevel_path}/bin/switch-to-configuration");
+    command_vec.extend(vec![
+        &switch_path,
+        command
+    ]);
+
+    let (cmd, args) = command_vec.split_first()
+        .ok_or(NixError::ConfigSwitch)?;
+
+    process::Command::new(cmd)
+        .args(args)
         .stderr(process::Stdio::inherit())
         .output()
         .map_err(|_| NixError::ConfigSwitch)

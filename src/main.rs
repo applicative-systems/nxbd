@@ -18,7 +18,8 @@ fn deploy_remote(system_attribute: &FlakeReference, host: &str) -> Result<(), ni
     let toplevel = nixlib::toplevel_output_path(system_attribute)?;
     println!("Built store path for {}: [{}]", system_attribute, toplevel);
     nixlib::copy_to_host(&toplevel, host)?;
-    nixlib::activate_profile(&toplevel, true, Some(host))
+    nixlib::activate_profile(&toplevel, true, Some(host))?;
+    nixlib::switch_to_configuration(&toplevel, "switch", true, Some(host))
 }
 
 fn main() -> Result<(), nixlib::NixError> {
@@ -68,8 +69,8 @@ fn main() -> Result<(), nixlib::NixError> {
 
             let toplevel = nixlib::toplevel_output_path(system_attribute)?;
             println!("Store path is [{toplevel}]");
-            nixlib::activate_profile(&toplevel, false, None)?;
-            nixlib::switch_to_configuration(&toplevel, "switch")?;
+            nixlib::activate_profile(&toplevel, true, None)?;
+            nixlib::switch_to_configuration(&toplevel, "switch", true, None)?;
         }
     }
 
