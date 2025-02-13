@@ -30,4 +30,6 @@ pub enum Command {
         #[arg(value_parser = nixlib::flakeref::parse_flake_reference)]
         system: Option<nixlib::FlakeReference>,
     },
+    /// Show information about the current user environment
+    Info,
 }

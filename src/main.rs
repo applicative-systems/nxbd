@@ -6,6 +6,7 @@ use clap::Parser;
 use nix::unistd;
 use nixlib::{
     deployinfo::{nixos_deploy_info, ConfigInfo},
+    userinfo::UserInfo,
     FlakeReference,
 };
 
@@ -87,6 +88,20 @@ fn main() -> Result<(), nixlib::NixError> {
             println!("Store path is [{toplevel}]");
             nixlib::activate_profile(&toplevel, true, None)?;
             nixlib::switch_to_configuration(&toplevel, "switch", true, None)?;
+        }
+        Command::Info => {
+            let info = UserInfo::collect();
+            println!("Current user: {}", info.username);
+            println!("\nLoaded SSH keys:");
+            if info.ssh_keys.is_empty() {
+                println!("  No SSH keys loaded in ssh-agent");
+            } else {
+                for key in &info.ssh_keys {
+                    println!("\nType:    {}", key.key_type);
+                    println!("Comment: {}", key.comment);
+                    println!("Key:     {}", key.key_data);
+                }
+            }
         }
     }
 

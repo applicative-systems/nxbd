@@ -1,6 +1,7 @@
 pub mod deployinfo;
 pub mod flakeref;
 mod outputhandling;
+pub mod userinfo;
 
 use std::process;
 use std::str;
