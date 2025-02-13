@@ -14,6 +14,12 @@ fn flakerefs_or_default(refs: &[FlakeReference]) -> Result<Vec<FlakeReference>, 
     }
 }
 
+fn deploy_remote(system_attribute: &FlakeReference, host: &str) -> Result<(), nixlib::NixError> {
+    let toplevel = nixlib::toplevel_output_path(system_attribute)?;
+    println!("Built store path for {}: [{}]", system_attribute, toplevel);
+    nixlib::copy_to_host(&toplevel, host)
+}
+
 fn main() -> Result<(), nixlib::NixError> {
     let cli = Cli::parse();
 
@@ -33,7 +39,13 @@ fn main() -> Result<(), nixlib::NixError> {
 
             let deploy_infos: Result<Vec<_>, _> = system_attributes
                 .iter()
-                .map(nixos_deploy_info)
+                .map(|sa| {
+                    let deploy_info: ConfigInfo = nixos_deploy_info(sa)?;
+                    match deploy_info.fqdn_or_host_name {
+                        Some(host) => deploy_remote(sa, &host),
+                        None => Err(nixlib::NixError::NoHostName)
+                    }
+                })
                 .collect();
             println!("Infos: {deploy_infos:?}");
         }

@@ -4,8 +4,6 @@ use serde::Deserialize;
 use std::process;
 use std::str;
 
-//TODO try #[serde(rename_all = "snake_case")]
-
 #[derive(Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 #[allow(dead_code)] // the deserialization code actually touches all fields

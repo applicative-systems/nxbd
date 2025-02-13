@@ -14,6 +14,7 @@ pub enum NixError {
     ConfigSwitch,
     ProfileSet,
     Deserialization,
+    NoHostName
 }
 
 pub fn nixos_configuration_attributes(flake_url: &str) -> Result<Vec<String>, NixError> {
@@ -47,10 +48,6 @@ pub fn nixos_configuration_flakerefs(flake_url: &str) -> Result<Vec<FlakeReferen
         .collect();
     Ok(flakerefs)
 }
-
-
-
-
 
 pub fn toplevel_output_path(flake_reference: &FlakeReference) -> Result<String, NixError> {
     let build_output = process::Command::new("nom")
@@ -88,6 +85,21 @@ pub fn switch_to_configuration(toplevel_path: &str, command: &str) -> Result<(),
         .args([
             &format!("{toplevel_path}/bin/switch-to-configuration"),
             command
+        ])
+        .stderr(process::Stdio::inherit())
+        .output()
+        .map_err(|_| NixError::ConfigSwitch)
+        .map(|_| ())
+}
+
+pub fn copy_to_host(toplevel_path: &str, host: &str) -> Result<(), NixError> {
+    let target = format!("ssh://{}", host);
+    process::Command::new("nix")
+        .args([
+            "copy",
+            "--to",
+            &target,
+            toplevel_path,
         ])
         .stderr(process::Stdio::inherit())
         .output()
