@@ -26,6 +26,7 @@ pub struct ConfigInfo {
     pub doc_doc_enable: bool,
     pub doc_info_enable: bool,
     pub doc_man_enable: bool,
+    pub is_x86: bool,
     pub users: Vec<NixUser>,
 }
 
@@ -54,7 +55,7 @@ pub fn nixos_deploy_info(flake_reference: &FlakeReference) -> Result<ConfigInfo,
     // At this point we're just mindlessly piling up all the attributes of a
     // config that the checks would ever need. Maybe at some point in the future
     // this should be modularized.
-    let nix_expr = r#"config:
+    let nix_expr = r#"{ config, pkgs, ... }:
           let
             f = expr: let x = builtins.tryEval expr; in if x.success then x.value else null;
             normalUsers = builtins.filter
@@ -80,6 +81,7 @@ pub fn nixos_deploy_info(flake_reference: &FlakeReference) -> Result<ConfigInfo,
                 docDocEnable = config.documentation.doc.enable;
                 docInfoEnable = config.documentation.info.enable;
                 docManEnable = config.documentation.man.enable;
+                isX86 = pkgs.stdenv.hostPlatform.isx86;
                 users = map (user: {
                     name = user.name;
                     extraGroups = user.extraGroups or [];
@@ -92,7 +94,7 @@ pub fn nixos_deploy_info(flake_reference: &FlakeReference) -> Result<ConfigInfo,
             "eval",
             "--json",
             &format!(
-                "{}#nixosConfigurations.\"{}\".config",
+                "{}#nixosConfigurations.\"{}\"",
                 flake_reference.url, flake_reference.attribute
             ),
             "--apply",
