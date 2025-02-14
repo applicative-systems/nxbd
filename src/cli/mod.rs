@@ -35,5 +35,8 @@ pub enum Command {
         /// Systems to inspect
         #[arg(value_parser = nixlib::flakeref::parse_flake_reference)]
         systems: Vec<nixlib::FlakeReference>,
+        /// Show detailed information
+        #[arg(short, long)]
+        verbose: bool,
     },
 }

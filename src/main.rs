@@ -90,64 +90,69 @@ fn main() -> Result<(), nixlib::NixError> {
             nixlib::activate_profile(&toplevel, true, None)?;
             nixlib::switch_to_configuration(&toplevel, "switch", true, None)?;
         }
-        Command::Info { systems } => {
-            // First show local SSH agent info
+        Command::Info { systems, verbose } => {
             let agent_info = UserInfo::collect();
-            println!("Current user: {}", agent_info.username);
-            println!("\nLoaded SSH keys in agent:");
-            if agent_info.ssh_keys.is_empty() {
-                println!("  No SSH keys loaded in ssh-agent");
-            } else {
-                for key in &agent_info.ssh_keys {
-                    println!("Key:     {}", key);
+
+            if *verbose {
+                println!("Current user: {}", agent_info.username);
+                println!("\nLoaded SSH keys in agent:");
+                if agent_info.ssh_keys.is_empty() {
+                    println!("  No SSH keys loaded in ssh-agent");
+                } else {
+                    for key in &agent_info.ssh_keys {
+                        println!("Key:     {}", key);
+                    }
                 }
             }
 
-            // Then show system configurations
             let system_attributes = flakerefs_or_default(systems)?;
-            println!("\nSystem Configurations:");
+            if *verbose {
+                println!("\nSystem Configurations:");
+            }
 
             for system in &system_attributes {
                 println!("\n=== {} ===", system);
                 match nixos_deploy_info(system) {
                     Ok(info) => {
-                        let hostname = info
-                            .fqdn_or_host_name
-                            .clone()
-                            .unwrap_or_else(|| "unknown".to_string());
-                        println!("Hostname: {}", hostname);
-                        println!(
-                            "SSH Service: {}",
-                            if info.ssh_enabled {
-                                "enabled"
-                            } else {
-                                "disabled"
-                            }
-                        );
-                        println!(
-                            "Wheel group sudo: {}",
-                            if info.wheel_needs_password {
-                                "requires password"
-                            } else {
-                                "passwordless"
-                            }
-                        );
+                        if *verbose {
+                            let hostname = info
+                                .fqdn_or_host_name
+                                .clone()
+                                .unwrap_or_else(|| "unknown".to_string());
+                            println!("Hostname: {}", hostname);
+                            println!(
+                                "SSH Service: {}",
+                                if info.ssh_enabled {
+                                    "enabled"
+                                } else {
+                                    "disabled"
+                                }
+                            );
+                            println!(
+                                "Wheel group sudo: {}",
+                                if info.wheel_needs_password {
+                                    "requires password"
+                                } else {
+                                    "passwordless"
+                                }
+                            );
 
-                        println!("\nUsers with SSH access:");
-                        for user in &info.users {
-                            if !user.ssh_keys.is_empty() {
-                                println!(
-                                    "\n  User: {} {}",
-                                    user.name,
-                                    if user.extra_groups.contains(&"wheel".to_string()) {
-                                        "(wheel)"
-                                    } else {
-                                        ""
+                            println!("\nUsers with SSH access:");
+                            for user in &info.users {
+                                if !user.ssh_keys.is_empty() {
+                                    println!(
+                                        "\n  User: {} {}",
+                                        user.name,
+                                        if user.extra_groups.contains(&"wheel".to_string()) {
+                                            "(wheel)"
+                                        } else {
+                                            ""
+                                        }
+                                    );
+                                    println!("  Authorized keys:");
+                                    for key in &user.ssh_keys {
+                                        println!("    {}", key);
                                     }
-                                );
-                                println!("  Authorized keys:");
-                                for key in &user.ssh_keys {
-                                    println!("    {}", key);
                                 }
                             }
                         }
@@ -171,12 +176,6 @@ fn main() -> Result<(), nixlib::NixError> {
             }
         }
     }
-
-    /*
-       println!("output: {:?}", nixlib::nixos_configuration_attributes("."));
-       println!("output: {:?}", nixlib::nixos_fqdn(&FlakeReference{ flake_path: ".".to_string(), attribute: "marketing".to_string() }));
-       println!("output: {:?}", nixlib::toplevel_output_path(&FlakeReference{ flake_path: ".".to_string(), attribute: "marketing".to_string() }));
-    */
 
     Ok(())
 }
