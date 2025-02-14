@@ -5,12 +5,13 @@ use crate::cli::{Cli, Command};
 use clap::Parser;
 use nix::unistd;
 use nixlib::{
-    configcheck::get_standard_checks,
-    deployinfo::{nixos_deploy_info, ConfigInfo},
-    userinfo::UserInfo,
+    configcheck::get_standard_checks, deployinfo::nixos_deploy_info, userinfo::UserInfo,
     FlakeReference, NixError,
 };
 use owo_colors::OwoColorize;
+
+// Add a constant for the arrow prefix
+const ARROW: &str = "→";
 
 fn flakerefs_or_default(refs: &[FlakeReference]) -> Result<Vec<FlakeReference>, nixlib::NixError> {
     if refs.is_empty() {
@@ -22,7 +23,6 @@ fn flakerefs_or_default(refs: &[FlakeReference]) -> Result<Vec<FlakeReference>, 
 
 fn deploy_remote(system_attribute: &FlakeReference, host: &str) -> Result<(), nixlib::NixError> {
     let toplevel = nixlib::toplevel_output_path(system_attribute)?;
-    println!("Built store path for {}: [{}]", system_attribute, toplevel);
     nixlib::copy_to_host(&toplevel, host)?;
     nixlib::activate_profile(&toplevel, true, Some(host))?;
     nixlib::switch_to_configuration(&toplevel, "switch", true, Some(host))
@@ -34,17 +34,31 @@ fn main() -> Result<(), nixlib::NixError> {
     match &cli.command {
         Command::Build { systems } => {
             let system_attributes = flakerefs_or_default(systems)?;
-            println!(
-                "Building systems: {}",
-                system_attributes
-                    .iter()
-                    .map(|f| f.to_string())
-                    .collect::<Vec<String>>()
-                    .join(" ")
-            );
+            if system_attributes.len() > 1 {
+                println!(
+                    "{}",
+                    format!(
+                        "{} Building systems: {}",
+                        ARROW,
+                        system_attributes
+                            .iter()
+                            .map(|f| f.to_string())
+                            .collect::<Vec<String>>()
+                            .join(" ")
+                    )
+                    .white()
+                );
+            }
             for system in &system_attributes {
+                println!(
+                    "{}",
+                    format!("{} Building system: {}", ARROW, system).white()
+                );
                 let toplevel = nixlib::toplevel_output_path(system)?;
-                println!("Built store path for {}: [{}]", system, toplevel);
+                println!(
+                    "{}",
+                    format!("{} Built store path for {}: {}", ARROW, system, toplevel).white()
+                );
             }
         }
         Command::SwitchRemote { systems } => {
@@ -58,17 +72,28 @@ fn main() -> Result<(), nixlib::NixError> {
                     .join(" ")
             );
 
-            let deploy_infos: Result<Vec<_>, _> = system_attributes
-                .iter()
-                .map(|sa| {
-                    let deploy_info: ConfigInfo = nixos_deploy_info(sa)?;
-                    match deploy_info.fqdn_or_host_name {
-                        Some(host) => deploy_remote(sa, &host),
-                        None => Err(nixlib::NixError::NoHostName),
-                    }
-                })
-                .collect();
-            println!("Infos: {deploy_infos:?}");
+            let deploy_infos: Vec<(FlakeReference, Result<(), nixlib::NixError>)> =
+                system_attributes
+                    .iter()
+                    .map(|sa| {
+                        let result =
+                            nixos_deploy_info(sa).and_then(|deploy_info| {
+                                match deploy_info.fqdn_or_host_name {
+                                    Some(host) => deploy_remote(sa, &host),
+                                    None => Err(nixlib::NixError::NoHostName),
+                                }
+                            });
+                        (sa.clone(), result)
+                    })
+                    .collect();
+
+            println!("\nDeployment Summary:");
+            for (system, result) in deploy_infos {
+                match result {
+                    Ok(()) => println!("  {} {}", "✓".green(), system),
+                    Err(e) => println!("  {} {} ({})", "✗".red(), system, e),
+                }
+            }
         }
         Command::SwitchLocal { system } => {
             let system_attribute = match system {
@@ -112,7 +137,7 @@ fn main() -> Result<(), nixlib::NixError> {
             }
 
             for system in &system_attributes {
-                println!("\n=== {} ===", system);
+                println!("\n=== {} ===", system.to_string().cyan().bold());
                 match nixos_deploy_info(system) {
                     Ok(info) => {
                         if *verbose {

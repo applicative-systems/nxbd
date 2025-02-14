@@ -43,6 +43,9 @@ where
 }
 
 pub fn nixos_deploy_info(flake_reference: &FlakeReference) -> Result<ConfigInfo, NixError> {
+    // At this point we're just mindlessly piling up all the attributes of a
+    // config that the checks would ever need. Maybe at some point in the future
+    // this should be modularized.
     let nix_expr = r#"config:
           let
             f = expr: let x = builtins.tryEval expr; in if x.success then x.value else null;

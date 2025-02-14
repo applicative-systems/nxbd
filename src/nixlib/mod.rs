@@ -4,6 +4,7 @@ pub mod flakeref;
 pub mod sshkeys;
 pub mod userinfo;
 
+use std::fmt;
 use std::process;
 use std::str;
 use which::which;
@@ -18,6 +19,19 @@ pub enum NixError {
     ProfileSet,
     Deserialization,
     NoHostName,
+}
+
+impl fmt::Display for NixError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Eval(msg) => write!(f, "Evaluation error: {msg}"),
+            Self::Build => write!(f, "Build failed"),
+            Self::ConfigSwitch => write!(f, "Failed to switch configuration"),
+            Self::ProfileSet => write!(f, "Failed to set profile"),
+            Self::Deserialization => write!(f, "Failed to parse output"),
+            Self::NoHostName => write!(f, "No hostname configured"),
+        }
+    }
 }
 
 pub fn nixos_configuration_attributes(flake_url: &str) -> Result<Vec<String>, NixError> {
@@ -153,7 +167,13 @@ pub fn switch_to_configuration(
 pub fn copy_to_host(toplevel_path: &str, host: &str) -> Result<(), NixError> {
     let target = format!("ssh://{}", host);
     process::Command::new("nix")
-        .args(["copy", "--to", &target, toplevel_path])
+        .args([
+            "copy",
+            "--substitute-on-destination",
+            "--to",
+            &target,
+            toplevel_path,
+        ])
         .stderr(process::Stdio::inherit())
         .output()
         .map_err(|_| NixError::ConfigSwitch)
