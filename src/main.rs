@@ -5,7 +5,7 @@ use crate::cli::{Cli, Command};
 use clap::Parser;
 use nix::unistd;
 use nixlib::{
-    configcheck::{get_standard_checks, CheckError},
+    configcheck::get_standard_checks,
     deployinfo::{nixos_deploy_info, ConfigInfo},
     userinfo::UserInfo,
     FlakeReference, NixError,

@@ -14,17 +14,8 @@ struct BuildOutput {
     outputs: HashMap<String, String>,
 }
 
-pub fn single_nix_build_output(stdout: &[u8]) -> Result<String, OutputError> {
-    let stdout_str = str::from_utf8(stdout).expect("Failed to convert to string");
-    let build_outputs: Vec<BuildOutput> =
-        serde_json::from_str(stdout_str).map_err(|_| OutputError::DeserializationError)?;
-
-    match build_outputs.len() {
-        0 => Err(OutputError::NoOutputPath),
-        1 => match build_outputs[0].outputs.get("out") {
-            Some(out) => Ok(out.clone()),
-            None => Err(OutputError::NoOutputPath),
-        },
-        _ => Err(OutputError::MultipleOutputPaths),
-    }
+#[allow(clippy::module_name_repetitions)]
+pub fn single_nix_build_output(output: &[u8]) -> Result<String, serde_json::Error> {
+    let parsed: Vec<String> = serde_json::from_slice(output)?;
+    Ok(parsed.into_iter().next().expect("Empty build output"))
 }

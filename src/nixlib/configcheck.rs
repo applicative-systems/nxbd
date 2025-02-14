@@ -1,4 +1,4 @@
-use super::{deployinfo::ConfigInfo, userinfo::UserInfo, NixError};
+use super::{deployinfo::ConfigInfo, userinfo::UserInfo};
 use std::fmt;
 
 #[derive(Debug)]
@@ -13,6 +13,7 @@ impl fmt::Display for CheckError {
     }
 }
 
+#[allow(clippy::module_name_repetitions)]
 pub struct ConfigCheck {
     pub name: String,
     pub description: String,

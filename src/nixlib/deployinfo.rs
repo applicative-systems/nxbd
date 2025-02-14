@@ -2,12 +2,11 @@ use super::sshkeys::SshKeyInfo;
 use super::{FlakeReference, NixError};
 
 use serde::Deserialize;
-use std::process;
 use std::str;
 
 #[derive(Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
-#[allow(dead_code)] // the deserialization code actually touches all fields
+#[allow(clippy::module_name_repetitions)]
 pub struct ConfigInfo {
     // The machine's host name
     pub hostname: Option<String>,
@@ -29,7 +28,7 @@ pub struct ConfigInfo {
 
 #[derive(Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
-#[allow(dead_code)] // the deserialization code actually touches all fields
+#[allow(clippy::module_name_repetitions)]
 pub struct NixUser {
     pub name: String,
     pub group: String,
