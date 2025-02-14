@@ -122,7 +122,7 @@ fn main() -> Result<(), libnxbd::NixError> {
             activate_profile(&toplevel, true, None)?;
             switch_to_configuration(&toplevel, "switch", true, None)?;
         }
-        Command::Info { systems, verbose } => {
+        Command::Check { systems, verbose } => {
             let agent_info = UserInfo::collect();
 
             if *verbose {
