@@ -1,4 +1,4 @@
-use super::{nixcommands::ConfigInfo, userinfo::UserInfo};
+use super::{nixosattributes::ConfigInfo, userinfo::UserInfo};
 use std::fmt;
 
 #[derive(Debug)]

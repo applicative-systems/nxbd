@@ -1,126 +1,176 @@
-use super::sshkeys::SshKeyInfo;
-use super::{FlakeReference, NixError};
-
-use serde::Deserialize;
+use serde_json;
+use std::fmt;
+use std::process;
 use std::str;
+use which::which;
 
-#[derive(Deserialize, Debug)]
-#[serde(rename_all = "camelCase")]
-#[allow(clippy::module_name_repetitions)]
-pub struct ConfigInfo {
-    pub fqdn_or_host_name: Option<String>,
-    pub fqdn: Option<String>,
-    pub wheel_needs_password: bool,
-    pub ssh_enabled: bool,
-    pub sudo_enabled: bool,
-    pub nix_trusts_wheel: bool,
-    pub boot_systemd: bool,
-    pub boot_grub: bool,
-    pub boot_systemd_generations: Option<i32>,
-    pub boot_grub_generations: Option<i32>,
-    pub journald_extra_config: String,
-    pub nix_extra_options: String,
-    pub doc_nixos_enabled: bool,
-    pub doc_enable: bool,
-    pub doc_dev_enable: bool,
-    pub doc_doc_enable: bool,
-    pub doc_info_enable: bool,
-    pub doc_man_enable: bool,
-    pub intel_microcode: bool,
-    pub amd_microcode: bool,
-    pub is_x86: bool,
-    pub nginx_enabled: bool,
-    pub nginx_brotli: bool,
-    pub nginx_gzip: bool,
-    pub nginx_optimisation: bool,
-    pub nginx_proxy: bool,
-    pub nginx_tls: bool,
-    pub users: Vec<NixUser>,
+use super::FlakeReference;
+
+#[derive(Debug)]
+pub enum NixError {
+    Eval(String),
+    Build,
+    ConfigSwitch,
+    ProfileSet,
+    Deserialization,
+    NoHostName,
 }
 
-#[derive(Deserialize, Debug)]
-#[serde(rename_all = "camelCase")]
-#[allow(clippy::module_name_repetitions)]
-pub struct NixUser {
-    pub name: String,
-    pub extra_groups: Vec<String>,
-    #[serde(deserialize_with = "deserialize_ssh_keys")]
-    pub ssh_keys: Vec<SshKeyInfo>,
+impl fmt::Display for NixError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Eval(msg) => write!(f, "Evaluation error: {msg}"),
+            Self::Build => write!(f, "Build failed"),
+            Self::ConfigSwitch => write!(f, "Failed to switch configuration"),
+            Self::ProfileSet => write!(f, "Failed to set profile"),
+            Self::Deserialization => write!(f, "Failed to parse output"),
+            Self::NoHostName => write!(f, "No hostname configured"),
+        }
+    }
 }
 
-fn deserialize_ssh_keys<'de, D>(deserializer: D) -> Result<Vec<SshKeyInfo>, D::Error>
-where
-    D: serde::Deserializer<'de>,
-{
-    let strings: Vec<String> = Vec::deserialize(deserializer)?;
-    Ok(strings
-        .iter()
-        .filter_map(|s| SshKeyInfo::from_authorized_key(s))
-        .collect())
-}
-
-pub fn nixos_deploy_info(flake_reference: &FlakeReference) -> Result<ConfigInfo, NixError> {
-    // At this point we're just mindlessly piling up all the attributes of a
-    // config that the checks would ever need. Maybe at some point in the future
-    // this should be modularized.
-    let nix_expr = r#"{ config, pkgs, ... }:
-        {
-            fqdnOrHostName = config.networking.fqdnOrHostName;
-            fqdn = config.networking.fqdn;
-            wheelNeedsPassword = config.security.sudo.wheelNeedsPassword;
-            sshEnabled = config.services.openssh.enable;
-            sudoEnabled = config.security.sudo.enable;
-            nixTrustsWheel = builtins.elem "@wheel" config.nix.settings.trusted-users;
-            bootSystemd = config.boot.loader.systemd-boot.enable;
-            bootGrub = config.boot.loader.grub.enable;
-            bootSystemdGenerations = config.boot.loader.systemd-boot.configurationLimit;
-            bootGrubGenerations = config.boot.loader.grub.configurationLimit;
-            journaldExtraConfig = config.services.journald.extraConfig;
-            nixExtraOptions = config.nix.extraOptions;
-            docNixosEnabled = config.documentation.nixos.enable;
-            docEnable = config.documentation.enable;
-            docDevEnable = config.documentation.dev.enable;
-            docDocEnable = config.documentation.doc.enable;
-            docInfoEnable = config.documentation.info.enable;
-            docManEnable = config.documentation.man.enable;
-            isX86 = pkgs.stdenv.hostPlatform.isx86;
-            intelMicrocode = config.hardware.cpu.intel.updateMicrocode;
-            amdMicrocode = config.hardware.cpu.amd.updateMicrocode;
-            nginxEnabled = config.services.nginx.enable;
-            nginxBrotli = config.services.nginx.recommendedBrotliSettings;
-            nginxGzip = config.services.nginx.recommendedGzipSettings;
-            nginxOptimisation = config.services.nginx.recommendedOptimisation;
-            nginxProxy = config.services.nginx.recommendedProxySettings;
-            nginxTls = config.services.nginx.recommendedTlsSettings;
-            users = map (user: {
-                inherit (user) name extraGroups;
-                sshKeys = user.openssh.authorizedKeys.keys or [];
-            }) (builtins.filter
-                (user: (user.isNormalUser or false))
-                (builtins.attrValues config.users.users));
-        }"#;
-
-    let output = std::process::Command::new("nix")
+pub fn nixos_configuration_attributes(flake_url: &str) -> Result<Vec<String>, NixError> {
+    let build_output = process::Command::new("nix")
         .args([
             "eval",
             "--json",
-            &format!(
-                "{}#nixosConfigurations.\"{}\"",
-                flake_reference.url, flake_reference.attribute
-            ),
+            &format!("{flake_url}#nixosConfigurations"),
             "--apply",
-            nix_expr,
+            "builtins.attrNames",
         ])
+        .stderr(process::Stdio::inherit())
         .output()
         .map_err(|_| NixError::Eval("Failed to execute nix eval".to_string()))?;
 
-    if !output.status.success() {
-        return Err(NixError::Eval(
-            String::from_utf8_lossy(&output.stderr).into_owned(),
-        ));
+    let stdout_str = str::from_utf8(&build_output.stdout).expect("Failed to convert to string");
+    let attributes: Vec<String> =
+        serde_json::from_str(stdout_str).map_err(|_| NixError::Deserialization)?;
+
+    Ok(attributes)
+}
+
+pub fn nixos_configuration_flakerefs(flake_url: &str) -> Result<Vec<FlakeReference>, NixError> {
+    let discovered_attrs = nixos_configuration_attributes(flake_url)?;
+    let flakerefs = discovered_attrs
+        .into_iter()
+        .map(|x| FlakeReference {
+            url: flake_url.to_string(),
+            attribute: x,
+        })
+        .collect();
+    Ok(flakerefs)
+}
+
+pub fn toplevel_output_path(flake_reference: &FlakeReference) -> Result<String, NixError> {
+    let (cmd, mut args) = match which("nom") {
+        Ok(_) => ("nom", vec!["build"]),
+        Err(_) => ("nix", vec!["build", "--no-link"]),
+    };
+
+    let target = format!(
+        "{0}#nixosConfigurations.\"{1}\".config.system.build.toplevel",
+        flake_reference.url, flake_reference.attribute
+    );
+
+    args.extend(["--json", &target]);
+
+    let build_output = process::Command::new(cmd)
+        .args(args)
+        .stderr(process::Stdio::inherit())
+        .output()
+        .map_err(|_| NixError::Build)?;
+
+    if !build_output.status.success() {
+        return Err(NixError::Build);
     }
 
-    let stdout_str = str::from_utf8(&output.stdout).map_err(|_| NixError::Deserialization)?;
+    let stdout_str = String::from_utf8_lossy(&build_output.stdout);
+    let parsed: Vec<serde_json::Value> =
+        serde_json::from_str(&stdout_str).map_err(|_| NixError::Deserialization)?;
+    let first_result = parsed.first().ok_or(NixError::Deserialization)?;
+    let out_path = first_result
+        .get("outputs")
+        .and_then(|o| o.get("out"))
+        .and_then(|o| o.as_str())
+        .ok_or(NixError::Deserialization)?;
+    let parsed = vec![out_path.to_string()];
+    Ok(parsed.into_iter().next().expect("Empty build output"))
+}
 
-    serde_json::from_str(&stdout_str).map_err(|_| NixError::Deserialization)
+pub fn activate_profile(
+    toplevel_path: &str,
+    use_sudo: bool,
+    remote_host: Option<&str>,
+) -> Result<(), NixError> {
+    let mut command_vec = Vec::new();
+
+    if let Some(host) = remote_host {
+        command_vec.push("ssh");
+        command_vec.push(host);
+    }
+    if use_sudo {
+        command_vec.push("sudo");
+    }
+
+    command_vec.extend(vec![
+        "nix-env",
+        "-p",
+        "/nix/var/nix/profiles/system",
+        "--set",
+        toplevel_path,
+    ]);
+
+    let (cmd, args) = command_vec.split_first().ok_or(NixError::ProfileSet)?;
+
+    process::Command::new(cmd)
+        .args(args)
+        .stderr(process::Stdio::inherit())
+        .output()
+        .map_err(|_| NixError::ProfileSet)
+        .map(|_| ())
+}
+
+pub fn switch_to_configuration(
+    toplevel_path: &str,
+    command: &str,
+    use_sudo: bool,
+    remote_host: Option<&str>,
+) -> Result<(), NixError> {
+    let mut command_vec = Vec::new();
+
+    if let Some(host) = remote_host {
+        command_vec.push("ssh");
+        command_vec.push(host);
+    }
+    if use_sudo {
+        command_vec.push("sudo");
+    }
+
+    let switch_path = format!("{toplevel_path}/bin/switch-to-configuration");
+    command_vec.extend(vec![&switch_path, command]);
+
+    let (cmd, args) = command_vec.split_first().ok_or(NixError::ConfigSwitch)?;
+
+    process::Command::new(cmd)
+        .args(args)
+        .stderr(process::Stdio::inherit())
+        .output()
+        .map_err(|_| NixError::ConfigSwitch)
+        .map(|_| ())
+}
+
+pub fn copy_to_host(toplevel_path: &str, host: &str) -> Result<(), NixError> {
+    let target = format!("ssh://{}", host);
+    process::Command::new("nix")
+        .args([
+            "copy",
+            "--substitute-on-destination",
+            "--to",
+            &target,
+            toplevel_path,
+        ])
+        .stderr(process::Stdio::inherit())
+        .output()
+        .map_err(|_| NixError::ConfigSwitch)
+        .map(|_| ())
 }

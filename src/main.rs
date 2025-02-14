@@ -5,7 +5,13 @@ use crate::cli::{Cli, Command};
 use clap::Parser;
 use nix::unistd;
 use nixlib::{
-    configcheck::get_standard_checks, nixcommands::nixos_deploy_info, userinfo::UserInfo,
+    configcheck::get_standard_checks,
+    nixcommands::{
+        activate_profile, copy_to_host, nixos_configuration_flakerefs, switch_to_configuration,
+        toplevel_output_path,
+    },
+    nixosattributes::nixos_deploy_info,
+    userinfo::UserInfo,
     FlakeReference, NixError,
 };
 use owo_colors::OwoColorize;
@@ -15,17 +21,17 @@ const ARROW: &str = "→";
 
 fn flakerefs_or_default(refs: &[FlakeReference]) -> Result<Vec<FlakeReference>, nixlib::NixError> {
     if refs.is_empty() {
-        nixlib::nixos_configuration_flakerefs(".")
+        nixos_configuration_flakerefs(".")
     } else {
         Ok(refs.to_owned())
     }
 }
 
 fn deploy_remote(system_attribute: &FlakeReference, host: &str) -> Result<(), nixlib::NixError> {
-    let toplevel = nixlib::toplevel_output_path(system_attribute)?;
-    nixlib::copy_to_host(&toplevel, host)?;
-    nixlib::activate_profile(&toplevel, true, Some(host))?;
-    nixlib::switch_to_configuration(&toplevel, "switch", true, Some(host))
+    let toplevel = toplevel_output_path(system_attribute)?;
+    copy_to_host(&toplevel, host)?;
+    activate_profile(&toplevel, true, Some(host))?;
+    switch_to_configuration(&toplevel, "switch", true, Some(host))
 }
 
 fn main() -> Result<(), nixlib::NixError> {
@@ -54,7 +60,7 @@ fn main() -> Result<(), nixlib::NixError> {
                     "{}",
                     format!("{} Building system: {}", ARROW, system).white()
                 );
-                let toplevel = nixlib::toplevel_output_path(system)?;
+                let toplevel = toplevel_output_path(system)?;
                 println!(
                     "{}",
                     format!("{} Built store path for {}: {}", ARROW, system, toplevel).white()
@@ -111,10 +117,10 @@ fn main() -> Result<(), nixlib::NixError> {
             };
             println!("Switching system: {system_attribute}");
 
-            let toplevel = nixlib::toplevel_output_path(system_attribute)?;
+            let toplevel = toplevel_output_path(system_attribute)?;
             println!("Store path is [{toplevel}]");
-            nixlib::activate_profile(&toplevel, true, None)?;
-            nixlib::switch_to_configuration(&toplevel, "switch", true, None)?;
+            activate_profile(&toplevel, true, None)?;
+            switch_to_configuration(&toplevel, "switch", true, None)?;
         }
         Command::Info { systems, verbose } => {
             let agent_info = UserInfo::collect();
