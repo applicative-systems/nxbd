@@ -9,6 +9,7 @@ use std::str;
 #[allow(clippy::module_name_repetitions)]
 pub struct ConfigInfo {
     pub fqdn_or_host_name: Option<String>,
+    pub fqdn: Option<String>,
     pub wheel_needs_password: bool,
     pub ssh_enabled: bool,
     pub sudo_enabled: bool,
@@ -19,6 +20,12 @@ pub struct ConfigInfo {
     pub boot_grub_generations: Option<i32>,
     pub journald_extra_config: String,
     pub nix_extra_options: String,
+    pub doc_nixos_enabled: bool,
+    pub doc_enable: bool,
+    pub doc_dev_enable: bool,
+    pub doc_doc_enable: bool,
+    pub doc_info_enable: bool,
+    pub doc_man_enable: bool,
     pub users: Vec<NixUser>,
 }
 
@@ -56,6 +63,7 @@ pub fn nixos_deploy_info(flake_reference: &FlakeReference) -> Result<ConfigInfo,
           in
             {
                 fqdnOrHostName = f config.networking.fqdnOrHostName;
+                fqdn = f config.networking.fqdn;
                 wheelNeedsPassword = config.security.sudo.wheelNeedsPassword;
                 sshEnabled = config.services.openssh.enable;
                 sudoEnabled = config.security.sudo.enable;
@@ -66,6 +74,12 @@ pub fn nixos_deploy_info(flake_reference: &FlakeReference) -> Result<ConfigInfo,
                 bootGrubGenerations = f config.boot.loader.grub.configurationLimit;
                 journaldExtraConfig = config.services.journald.extraConfig;
                 nixExtraOptions = config.nix.extraOptions;
+                docNixosEnabled = config.documentation.nixos.enable;
+                docEnable = config.documentation.enable;
+                docDevEnable = config.documentation.dev.enable;
+                docDocEnable = config.documentation.doc.enable;
+                docInfoEnable = config.documentation.info.enable;
+                docManEnable = config.documentation.man.enable;
                 users = map (user: {
                     name = user.name;
                     extraGroups = user.extraGroups or [];

@@ -223,5 +223,57 @@ pub fn get_standard_checks() -> Vec<ConfigCheck> {
                 }
             },
         ),
+        ConfigCheck::new(
+            "Disable Documentation on Servers",
+            "Checks if documentation is disabled on servers to reduce closure size",
+            |config, _user_info| {
+                let mut errors = Vec::new();
+                // Only check servers (those with FQDN set)
+                if config.fqdn.is_some() {
+                    if config.doc_nixos_enabled {
+                        errors.push(CheckError {
+                            check_name: "Documentation".to_string(),
+                            message: "NixOS documentation enabled. Consider setting documentation.nixos.enable = false".to_string(),
+                        });
+                    }
+                    if config.doc_enable {
+                        errors.push(CheckError {
+                            check_name: "Documentation".to_string(),
+                            message: "General documentation enabled. Consider setting documentation.enable = false".to_string(),
+                        });
+                    }
+                    if config.doc_dev_enable {
+                        errors.push(CheckError {
+                            check_name: "Documentation".to_string(),
+                            message: "Development documentation enabled. Consider setting documentation.dev.enable = false".to_string(),
+                        });
+                    }
+                    if config.doc_doc_enable {
+                        errors.push(CheckError {
+                            check_name: "Documentation".to_string(),
+                            message: "Doc documentation enabled. Consider setting documentation.doc.enable = false".to_string(),
+                        });
+                    }
+                    if config.doc_info_enable {
+                        errors.push(CheckError {
+                            check_name: "Documentation".to_string(),
+                            message: "Info documentation enabled. Consider setting documentation.info.enable = false".to_string(),
+                        });
+                    }
+                    if config.doc_man_enable {
+                        errors.push(CheckError {
+                            check_name: "Documentation".to_string(),
+                            message: "Man pages enabled. Consider setting documentation.man.enable = false".to_string(),
+                        });
+                    }
+                }
+
+                if errors.is_empty() {
+                    Ok(())
+                } else {
+                    Err(errors)
+                }
+            },
+        ),
     ]
 }
