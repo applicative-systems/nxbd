@@ -29,6 +29,12 @@ pub struct ConfigInfo {
     pub intel_microcode: bool,
     pub amd_microcode: bool,
     pub is_x86: bool,
+    pub nginx_enabled: bool,
+    pub nginx_brotli: bool,
+    pub nginx_gzip: bool,
+    pub nginx_optimisation: bool,
+    pub nginx_proxy: bool,
+    pub nginx_tls: bool,
     pub users: Vec<NixUser>,
 }
 
@@ -86,6 +92,12 @@ pub fn nixos_deploy_info(flake_reference: &FlakeReference) -> Result<ConfigInfo,
                 isX86 = pkgs.stdenv.hostPlatform.isx86;
                 intelMicrocode = config.hardware.cpu.intel.updateMicrocode;
                 amdMicrocode = config.hardware.cpu.amd.updateMicrocode;
+                nginxEnabled = config.services.nginx.enable;
+                nginxBrotli = config.services.nginx.recommendedBrotliSettings;
+                nginxGzip = config.services.nginx.recommendedGzipSettings;
+                nginxOptimisation = config.services.nginx.recommendedOptimisation;
+                nginxProxy = config.services.nginx.recommendedProxySettings;
+                nginxTls = config.services.nginx.recommendedTlsSettings;
                 users = map (user: {
                     name = user.name;
                     extraGroups = user.extraGroups or [];

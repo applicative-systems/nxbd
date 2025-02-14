@@ -296,5 +296,50 @@ pub fn get_standard_checks() -> Vec<ConfigCheck> {
                 }
             }
         ),
+        ConfigCheck::new(
+            "Nginx Recommended Settings",
+            "Checks if nginx has recommended settings enabled",
+            |config, _user_info| {
+                let mut errors = Vec::new();
+                if config.nginx_enabled {
+                    if !config.nginx_brotli {
+                        errors.push(CheckError {
+                            check_name: "Nginx Settings".to_string(),
+                            message: "Brotli compression not enabled. Consider setting services.nginx.recommendedBrotliSettings = true".to_string(),
+                        });
+                    }
+                    if !config.nginx_gzip {
+                        errors.push(CheckError {
+                            check_name: "Nginx Settings".to_string(),
+                            message: "Gzip compression not enabled. Consider setting services.nginx.recommendedGzipSettings = true".to_string(),
+                        });
+                    }
+                    if !config.nginx_optimisation {
+                        errors.push(CheckError {
+                            check_name: "Nginx Settings".to_string(),
+                            message: "Optimisation settings not enabled. Consider setting services.nginx.recommendedOptimisation = true".to_string(),
+                        });
+                    }
+                    if !config.nginx_proxy {
+                        errors.push(CheckError {
+                            check_name: "Nginx Settings".to_string(),
+                            message: "Proxy settings not enabled. Consider setting services.nginx.recommendedProxySettings = true".to_string(),
+                        });
+                    }
+                    if !config.nginx_tls {
+                        errors.push(CheckError {
+                            check_name: "Nginx Settings".to_string(),
+                            message: "TLS settings not enabled. Consider setting services.nginx.recommendedTlsSettings = true".to_string(),
+                        });
+                    }
+                }
+
+                if errors.is_empty() {
+                    Ok(())
+                } else {
+                    Err(errors)
+                }
+            },
+        ),
     ]
 }
