@@ -1,6 +1,8 @@
+pub mod configcheck;
 pub mod deployinfo;
 pub mod flakeref;
 mod outputhandling;
+pub mod sshkeys;
 pub mod userinfo;
 
 use std::process;

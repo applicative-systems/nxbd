@@ -1,3 +1,4 @@
+use super::sshkeys::SshKeyInfo;
 use super::{FlakeReference, NixError};
 
 use serde::Deserialize;
@@ -27,14 +28,25 @@ pub struct ConfigInfo {
 }
 
 #[derive(Deserialize, Debug)]
-struct NixUser {
+#[serde(rename_all = "camelCase")]
+#[allow(dead_code)] // the deserialization code actually touches all fields
+pub struct NixUser {
     pub name: String,
-    #[serde(default)]
     pub group: String,
-    #[serde(default)]
-    pub extraGroups: Vec<String>,
-    #[serde(default)]
-    pub sshKeys: Vec<String>,
+    pub extra_groups: Vec<String>,
+    #[serde(deserialize_with = "deserialize_ssh_keys")]
+    pub ssh_keys: Vec<SshKeyInfo>,
+}
+
+fn deserialize_ssh_keys<'de, D>(deserializer: D) -> Result<Vec<SshKeyInfo>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let strings: Vec<String> = Vec::deserialize(deserializer)?;
+    Ok(strings
+        .iter()
+        .filter_map(|s| SshKeyInfo::from_authorized_key(s))
+        .collect())
 }
 
 pub fn nixos_deploy_info(flake_reference: &FlakeReference) -> Result<ConfigInfo, NixError> {
@@ -78,24 +90,4 @@ pub fn nixos_deploy_info(flake_reference: &FlakeReference) -> Result<ConfigInfo,
     let stdout_str = str::from_utf8(&output.stdout).expect("Failed to convert to string");
 
     serde_json::from_str(&stdout_str).map_err(|_| NixError::Deserialization)
-}
-
-impl ConfigInfo {
-    pub fn get_users_with_ssh_keys(
-        &self,
-        _flake_reference: &FlakeReference,
-    ) -> Result<Vec<(String, bool, Vec<String>)>, NixError> {
-        Ok(self
-            .users
-            .iter()
-            .filter(|user| !user.sshKeys.is_empty())
-            .map(|user| {
-                (
-                    user.name.clone(),
-                    user.extraGroups.contains(&"wheel".to_string()),
-                    user.sshKeys.clone(),
-                )
-            })
-            .collect())
-    }
 }

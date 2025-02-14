@@ -1,11 +1,5 @@
+use super::sshkeys::SshKeyInfo;
 use std::process::Command;
-
-#[derive(Debug)]
-pub struct SshKeyInfo {
-    pub comment: String,
-    pub key_type: String,
-    pub key_data: String,
-}
 
 #[derive(Debug)]
 pub struct UserInfo {
@@ -25,22 +19,7 @@ impl UserInfo {
             .map(|output| {
                 output
                     .lines()
-                    .filter_map(|line| {
-                        let parts: Vec<&str> = line.split_whitespace().collect();
-                        match parts.as_slice() {
-                            [key_type, key_data, comment, ..] => Some(SshKeyInfo {
-                                key_type: key_type.to_string(),
-                                key_data: key_data.to_string(),
-                                comment: comment.to_string(),
-                            }),
-                            [key_type, key_data] => Some(SshKeyInfo {
-                                key_type: key_type.to_string(),
-                                key_data: key_data.to_string(),
-                                comment: String::new(),
-                            }),
-                            _ => None,
-                        }
-                    })
+                    .filter_map(SshKeyInfo::from_authorized_key)
                     .collect()
             })
             .unwrap_or_else(Vec::new);

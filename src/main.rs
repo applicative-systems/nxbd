@@ -5,6 +5,7 @@ use crate::cli::{Cli, Command};
 use clap::Parser;
 use nix::unistd;
 use nixlib::{
+    configcheck::{get_standard_checks, CheckError},
     deployinfo::{nixos_deploy_info, ConfigInfo},
     userinfo::UserInfo,
     FlakeReference,
@@ -98,9 +99,7 @@ fn main() -> Result<(), nixlib::NixError> {
                 println!("  No SSH keys loaded in ssh-agent");
             } else {
                 for key in &agent_info.ssh_keys {
-                    println!("\nType:    {}", key.key_type);
-                    println!("Comment: {}", key.comment);
-                    println!("Key:     {}", key.key_data);
+                    println!("Key:     {}", key);
                 }
             }
 
@@ -135,21 +134,36 @@ fn main() -> Result<(), nixlib::NixError> {
                         );
 
                         println!("\nUsers with SSH access:");
-                        match info.get_users_with_ssh_keys(system) {
-                            Ok(users) => {
-                                for (username, is_wheel, ssh_keys) in users {
-                                    println!(
-                                        "\n  User: {} {}",
-                                        username,
-                                        if is_wheel { "(wheel)" } else { "" }
-                                    );
-                                    println!("  Authorized keys:");
-                                    for key in ssh_keys {
-                                        println!("    {}", key);
+                        for user in &info.users {
+                            if !user.ssh_keys.is_empty() {
+                                println!(
+                                    "\n  User: {} {}",
+                                    user.name,
+                                    if user.extra_groups.contains(&"wheel".to_string()) {
+                                        "(wheel)"
+                                    } else {
+                                        ""
+                                    }
+                                );
+                                println!("  Authorized keys:");
+                                for key in &user.ssh_keys {
+                                    println!("    {}", key);
+                                }
+                            }
+                        }
+
+                        println!("\nConfiguration Checks:");
+                        for check in get_standard_checks() {
+                            print!("  {} ... ", check.name);
+                            match check.check(&info, &agent_info) {
+                                Ok(()) => println!("✓"),
+                                Err(errors) => {
+                                    println!("✗");
+                                    for error in errors {
+                                        println!("    - {}", error);
                                     }
                                 }
                             }
-                            Err(e) => println!("Error getting user info: {:?}", e),
                         }
                     }
                     Err(e) => println!("Error getting system info: {:?}", e),
