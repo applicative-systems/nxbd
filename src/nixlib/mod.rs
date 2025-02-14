@@ -75,8 +75,16 @@ pub fn toplevel_output_path(flake_reference: &FlakeReference) -> Result<String, 
         return Err(NixError::Build);
     }
 
-    let parsed: Vec<String> =
-        serde_json::from_slice(&build_output.stdout).map_err(|_| NixError::Deserialization)?;
+    let stdout_str = String::from_utf8_lossy(&build_output.stdout);
+    let parsed: Vec<serde_json::Value> =
+        serde_json::from_str(&stdout_str).map_err(|_| NixError::Deserialization)?;
+    let first_result = parsed.first().ok_or(NixError::Deserialization)?;
+    let out_path = first_result
+        .get("outputs")
+        .and_then(|o| o.get("out"))
+        .and_then(|o| o.as_str())
+        .ok_or(NixError::Deserialization)?;
+    let parsed = vec![out_path.to_string()];
     Ok(parsed.into_iter().next().expect("Empty build output"))
 }
 
