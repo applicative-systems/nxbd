@@ -1,10 +1,9 @@
 mod cli;
-mod nixlib;
+mod libnxbd;
 
 use crate::cli::{Cli, Command};
 use clap::Parser;
-use nix::unistd;
-use nixlib::{
+use libnxbd::{
     configcheck::get_standard_checks,
     nixcommands::{
         activate_profile, copy_to_host, nixos_configuration_flakerefs, switch_to_configuration,
@@ -14,12 +13,13 @@ use nixlib::{
     userinfo::UserInfo,
     FlakeReference, NixError,
 };
+use nix::unistd;
 use owo_colors::OwoColorize;
 
 // Add a constant for the arrow prefix
 const ARROW: &str = "→";
 
-fn flakerefs_or_default(refs: &[FlakeReference]) -> Result<Vec<FlakeReference>, nixlib::NixError> {
+fn flakerefs_or_default(refs: &[FlakeReference]) -> Result<Vec<FlakeReference>, libnxbd::NixError> {
     if refs.is_empty() {
         nixos_configuration_flakerefs(".")
     } else {
@@ -27,14 +27,14 @@ fn flakerefs_or_default(refs: &[FlakeReference]) -> Result<Vec<FlakeReference>, 
     }
 }
 
-fn deploy_remote(system_attribute: &FlakeReference, host: &str) -> Result<(), nixlib::NixError> {
+fn deploy_remote(system_attribute: &FlakeReference, host: &str) -> Result<(), libnxbd::NixError> {
     let toplevel = toplevel_output_path(system_attribute)?;
     copy_to_host(&toplevel, host)?;
     activate_profile(&toplevel, true, Some(host))?;
     switch_to_configuration(&toplevel, "switch", true, Some(host))
 }
 
-fn main() -> Result<(), nixlib::NixError> {
+fn main() -> Result<(), libnxbd::NixError> {
     let cli = Cli::parse();
 
     match &cli.command {
@@ -78,7 +78,7 @@ fn main() -> Result<(), nixlib::NixError> {
                     .join(" ")
             );
 
-            let deploy_infos: Vec<(FlakeReference, Result<(), nixlib::NixError>)> =
+            let deploy_infos: Vec<(FlakeReference, Result<(), libnxbd::NixError>)> =
                 system_attributes
                     .iter()
                     .map(|sa| {
@@ -86,7 +86,7 @@ fn main() -> Result<(), nixlib::NixError> {
                             nixos_deploy_info(sa).and_then(|deploy_info| {
                                 match deploy_info.fqdn_or_host_name {
                                     Some(host) => deploy_remote(sa, &host),
-                                    None => Err(nixlib::NixError::NoHostName),
+                                    None => Err(libnxbd::NixError::NoHostName),
                                 }
                             });
                         (sa.clone(), result)
