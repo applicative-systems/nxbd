@@ -10,6 +10,7 @@ use nixlib::{
     userinfo::UserInfo,
     FlakeReference,
 };
+use owo_colors::OwoColorize;
 
 fn flakerefs_or_default(refs: &[FlakeReference]) -> Result<Vec<FlakeReference>, nixlib::NixError> {
     if refs.is_empty() {
@@ -161,9 +162,9 @@ fn main() -> Result<(), nixlib::NixError> {
                         for check in get_standard_checks() {
                             print!("  {} ... ", check.name);
                             match check.check(&info, &agent_info) {
-                                Ok(()) => println!("✓"),
+                                Ok(()) => println!("{}", "✓".green()),
                                 Err(errors) => {
-                                    println!("✗");
+                                    println!("{}", "✗".red());
                                     for error in errors {
                                         println!("    - {}", error);
                                     }
