@@ -1,5 +1,5 @@
-use super::sshkeys::SshKeyInfo;
 use super::{FlakeReference, NixError};
+use super::sshkeys::SshKeyInfo;
 
 use serde::Deserialize;
 use std::process;
@@ -91,3 +91,4 @@ pub fn nixos_deploy_info(flake_reference: &FlakeReference) -> Result<ConfigInfo,
 
     serde_json::from_str(&stdout_str).map_err(|_| NixError::Deserialization)
 }
+
