@@ -1,6 +1,6 @@
 pub mod configcheck;
-pub mod deployinfo;
 pub mod flakeref;
+pub mod nixcommands;
 pub mod sshkeys;
 pub mod userinfo;
 
