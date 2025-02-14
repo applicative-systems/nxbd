@@ -8,7 +8,7 @@ use nixlib::{
     configcheck::{get_standard_checks, CheckError},
     deployinfo::{nixos_deploy_info, ConfigInfo},
     userinfo::UserInfo,
-    FlakeReference,
+    FlakeReference, NixError,
 };
 use owo_colors::OwoColorize;
 
@@ -172,7 +172,10 @@ fn main() -> Result<(), nixlib::NixError> {
                             }
                         }
                     }
-                    Err(e) => println!("Error getting system info: {:?}", e),
+                    Err(e) => match e {
+                        NixError::Eval(msg) => println!("Error evaluating system info:\n{}", msg),
+                        _ => println!("Error getting system info: {:?}", e),
+                    },
                 }
             }
         }

@@ -12,7 +12,7 @@ pub use flakeref::FlakeReference;
 
 #[derive(Debug)]
 pub enum NixError {
-    Eval,
+    Eval(String),
     Build,
     ConfigSwitch,
     ProfileSet,
@@ -31,11 +31,11 @@ pub fn nixos_configuration_attributes(flake_url: &str) -> Result<Vec<String>, Ni
         ])
         .stderr(process::Stdio::inherit())
         .output()
-        .map_err(|_| NixError::Eval)?;
+        .map_err(|_| NixError::Eval("Failed to execute nix eval".to_string()))?;
 
     let stdout_str = str::from_utf8(&build_output.stdout).expect("Failed to convert to string");
     let attributes: Vec<String> =
-        serde_json::from_str(stdout_str).map_err(|_| NixError::Deserialization)?;
+        serde_json::from_str(stdout_str).map_err(|e| NixError::Deserialization)?;
 
     Ok(attributes)
 }

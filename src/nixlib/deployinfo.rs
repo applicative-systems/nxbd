@@ -1,5 +1,5 @@
-use super::{FlakeReference, NixError};
 use super::sshkeys::SshKeyInfo;
+use super::{FlakeReference, NixError};
 
 use serde::Deserialize;
 use std::process;
@@ -85,10 +85,15 @@ pub fn nixos_deploy_info(flake_reference: &FlakeReference) -> Result<ConfigInfo,
             nix_expr,
         ])
         .output()
-        .map_err(|_| NixError::Eval)?;
+        .map_err(|_| NixError::Eval("Failed to execute nix eval".to_string()))?;
 
-    let stdout_str = str::from_utf8(&output.stdout).expect("Failed to convert to string");
+    if !output.status.success() {
+        return Err(NixError::Eval(
+            String::from_utf8_lossy(&output.stderr).into_owned(),
+        ));
+    }
+
+    let stdout_str = str::from_utf8(&output.stdout).map_err(|_| NixError::Deserialization)?;
 
     serde_json::from_str(&stdout_str).map_err(|_| NixError::Deserialization)
 }
-
