@@ -13,6 +13,10 @@ pub struct ConfigInfo {
     pub ssh_enabled: bool,
     pub sudo_enabled: bool,
     pub nix_trusts_wheel: bool,
+    pub boot_systemd: bool,
+    pub boot_grub: bool,
+    pub boot_systemd_generations: Option<i32>,
+    pub boot_grub_generations: Option<i32>,
     pub users: Vec<NixUser>,
 }
 
@@ -51,6 +55,10 @@ pub fn nixos_deploy_info(flake_reference: &FlakeReference) -> Result<ConfigInfo,
                 sshEnabled = config.services.openssh.enable;
                 sudoEnabled = config.security.sudo.enable;
                 nixTrustsWheel = builtins.elem "@wheel" config.nix.settings.trusted-users;
+                bootSystemd = config.boot.loader.systemd-boot.enable;
+                bootGrub = config.boot.loader.grub.enable;
+                bootSystemdGenerations = f config.boot.loader.systemd-boot.configurationLimit;
+                bootGrubGenerations = f config.boot.loader.grub.configurationLimit;
                 users = map (user: {
                     name = user.name;
                     extraGroups = user.extraGroups or [];

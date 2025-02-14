@@ -112,6 +112,56 @@ pub fn get_standard_checks() -> Vec<ConfigCheck> {
                 }
             },
         ),
-        // Add more standard checks here
+        ConfigCheck::new(
+            "Boot Configuration Limit",
+            "Checks if system configuration generations are reasonably limited to prevent disk space waste",
+            |config, _user_info| {
+                let mut errors = Vec::new();
+
+                if config.boot_systemd {
+                    if let Some(limit) = config.boot_systemd_generations {
+                        if limit > 10 {
+                            errors.push(CheckError {
+                                check_name: "systemd-boot Generations".to_string(),
+                                message: format!(
+                                    "Too many generations kept ({}). Consider reducing to 10 or less",
+                                    limit
+                                ),
+                            });
+                        }
+                    } else {
+                        errors.push(CheckError {
+                            check_name: "systemd-boot Generations".to_string(),
+                            message: "No generation limit set. This may prevent old generations from being garbage collected".to_string(),
+                        });
+                    }
+                }
+
+                if config.boot_grub {
+                    if let Some(limit) = config.boot_grub_generations {
+                        if limit > 10 {
+                            errors.push(CheckError {
+                                check_name: "GRUB Generations".to_string(),
+                                message: format!(
+                                    "Too many generations kept ({}). Consider reducing to 10 or less",
+                                    limit
+                                ),
+                            });
+                        }
+                    } else {
+                        errors.push(CheckError {
+                            check_name: "GRUB Generations".to_string(),
+                            message: "No generation limit set. This may prevent old generations from being garbage collected".to_string(),
+                        });
+                    }
+                }
+
+                if errors.is_empty() {
+                    Ok(())
+                } else {
+                    Err(errors)
+                }
+            },
+        ),
     ]
 }
