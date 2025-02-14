@@ -8,21 +8,11 @@ use std::str;
 #[serde(rename_all = "camelCase")]
 #[allow(clippy::module_name_repetitions)]
 pub struct ConfigInfo {
-    // The machine's host name
-    pub hostname: Option<String>,
-    // The machine's fully qualified domain name
-    pub fqdn: Option<String>,
-    // The machine's fully qualified domain name or host name
     pub fqdn_or_host_name: Option<String>,
-    // Whether the wheel user needs a password to sudo
     pub wheel_needs_password: bool,
-    // Whether SSH is enabled
     pub ssh_enabled: bool,
-    // Whether sudo is enabled
     pub sudo_enabled: bool,
-    // Whether the nix user trusts the wheel group
     pub nix_trusts_wheel: bool,
-    // Users with their SSH keys
     pub users: Vec<NixUser>,
 }
 
@@ -56,8 +46,6 @@ pub fn nixos_deploy_info(flake_reference: &FlakeReference) -> Result<ConfigInfo,
                 (builtins.attrValues config.users.users);
           in
             {
-                hostname = f config.networking.hostName;
-                fqdn = f config.networking.fqdn;
                 fqdnOrHostName = f config.networking.fqdnOrHostName;
                 wheelNeedsPassword = config.security.sudo.wheelNeedsPassword;
                 sshEnabled = config.services.openssh.enable;
