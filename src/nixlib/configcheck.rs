@@ -189,8 +189,8 @@ pub fn get_standard_checks() -> Vec<ConfigCheck> {
             },
         ),
         ConfigCheck::new(
-            "Nix Features",
-            "Checks if essential nix features are enabled",
+            "Nix Flakes",
+            "Checks if flakes are enabled",
             |config, _user_info| {
                 let mut errors = Vec::new();
                 if let Some(features_line) = config.nix_extra_options
