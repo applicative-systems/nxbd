@@ -275,5 +275,26 @@ pub fn get_standard_checks() -> Vec<ConfigCheck> {
                 }
             },
         ),
+        ConfigCheck::new(
+            "Enable CPU Microcode Updates on x86",
+            "Checks if CPU microcode updates are enabled on x86 systems",
+            |config, _user_info| {
+                let mut errors = Vec::new();
+                if config.is_x86 {
+                    if !config.intel_microcode && !config.amd_microcode {
+                        errors.push(CheckError {
+                            check_name: "Microcode".to_string(),
+                            message: "No CPU microcode updates enabled. Set either hardware.cpu.intel.updateMicrocode or hardware.cpu.amd.updateMicrocode to true".to_string(),
+                        });
+                    }
+                }
+
+                if errors.is_empty() {
+                    Ok(())
+                } else {
+                    Err(errors)
+                }
+            }
+        ),
     ]
 }

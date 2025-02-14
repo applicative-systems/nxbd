@@ -26,6 +26,8 @@ pub struct ConfigInfo {
     pub doc_doc_enable: bool,
     pub doc_info_enable: bool,
     pub doc_man_enable: bool,
+    pub intel_microcode: bool,
+    pub amd_microcode: bool,
     pub is_x86: bool,
     pub users: Vec<NixUser>,
 }
@@ -82,6 +84,8 @@ pub fn nixos_deploy_info(flake_reference: &FlakeReference) -> Result<ConfigInfo,
                 docInfoEnable = config.documentation.info.enable;
                 docManEnable = config.documentation.man.enable;
                 isX86 = pkgs.stdenv.hostPlatform.isx86;
+                intelMicrocode = config.hardware.cpu.intel.updateMicrocode;
+                amdMicrocode = config.hardware.cpu.amd.updateMicrocode;
                 users = map (user: {
                     name = user.name;
                     extraGroups = user.extraGroups or [];
