@@ -188,5 +188,40 @@ pub fn get_standard_checks() -> Vec<ConfigCheck> {
                 }
             },
         ),
+        ConfigCheck::new(
+            "Nix Features",
+            "Checks if essential nix features are enabled",
+            |config, _user_info| {
+                let mut errors = Vec::new();
+                if let Some(features_line) = config.nix_extra_options
+                    .lines()
+                    .find(|line| line.trim().starts_with("experimental-features"))
+                {
+                    if !features_line.contains("nix-command") {
+                        errors.push(CheckError {
+                            check_name: "Nix Features".to_string(),
+                            message: "Missing required nix feature 'nix-command'. Add it to experimental-features in nix.extraOptions".to_string(),
+                        });
+                    }
+                    if !features_line.contains("flakes") {
+                        errors.push(CheckError {
+                            check_name: "Nix Features".to_string(), 
+                            message: "Missing required nix feature 'flakes'. Add it to experimental-features in nix.extraOptions".to_string(),
+                        });
+                    }
+                } else {
+                    errors.push(CheckError {
+                        check_name: "Nix Features".to_string(),
+                        message: "No experimental-features configured. Add 'experimental-features = nix-command flakes' to nix.extraOptions".to_string(),
+                    });
+                }
+
+                if errors.is_empty() {
+                    Ok(())
+                } else {
+                    Err(errors)
+                }
+            },
+        ),
     ]
 }
