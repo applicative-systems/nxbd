@@ -54,8 +54,9 @@
           devShells.default = pkgs.mkShell {
             inputsFrom = [ config.packages.nxbd ];
             nativeBuildInputs = [
-              pkgs.clippy
               pkgs.cargo-edit
+              pkgs.clippy
+              treefmtEval.config.build.wrapper
             ];
           };
 
