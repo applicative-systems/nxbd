@@ -29,4 +29,5 @@ pub enum Command {
         #[arg(short, long)]
         verbose: bool,
     },
+    Checks,
 }

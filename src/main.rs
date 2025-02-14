@@ -210,6 +210,13 @@ fn main() -> Result<(), libnxbd::NixError> {
                 }
             }
         }
+        Command::Checks => {
+            println!("Available configuration checks:\n");
+            for check in get_standard_checks() {
+                println!("{}", check.name.cyan().bold());
+                println!("  {}\n", check.description);
+            }
+        }
     }
 
     Ok(())
