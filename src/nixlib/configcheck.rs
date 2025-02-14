@@ -41,7 +41,7 @@ pub fn get_standard_checks() -> Vec<ConfigCheck> {
     vec![
         ConfigCheck::new(
             "Remote Deployment Support",
-            "Checks if the system supports remote deployments",
+            "Checks if the system has the required configuration (SSH, sudo, permissions) to safely perform remote deployments",
             |config, user_info| {
                 let mut errors = Vec::new();
 
@@ -154,6 +154,31 @@ pub fn get_standard_checks() -> Vec<ConfigCheck> {
                             message: "No generation limit set. This may prevent old generations from being garbage collected".to_string(),
                         });
                     }
+                }
+
+                if errors.is_empty() {
+                    Ok(())
+                } else {
+                    Err(errors)
+                }
+            },
+        ),
+        ConfigCheck::new(
+            "Journald Space Management",
+            "Checks if journald has proper disk space limits configured",
+            |config, _user_info| {
+                let mut errors = Vec::new();
+                let config_str = &config.journald_extra_config;
+
+                let has_max_use = config_str.contains("SystemMaxUse=");
+                let has_max_file_size = config_str.contains("SystemMaxFileSize=");
+                let has_keep_free = config_str.contains("SystemKeepFree=");
+
+                if !has_keep_free && !(has_max_use && has_max_file_size) {
+                    errors.push(CheckError {
+                        check_name: "Journald Limits".to_string(),
+                        message: "No journald space limits configured. Set either 'SystemKeepFree' or both 'SystemMaxUse' and 'SystemMaxFileSize'".to_string(),
+                    });
                 }
 
                 if errors.is_empty() {

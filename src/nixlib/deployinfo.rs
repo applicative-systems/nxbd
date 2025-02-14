@@ -17,6 +17,7 @@ pub struct ConfigInfo {
     pub boot_grub: bool,
     pub boot_systemd_generations: Option<i32>,
     pub boot_grub_generations: Option<i32>,
+    pub journald_extra_config: String,
     pub users: Vec<NixUser>,
 }
 
@@ -59,6 +60,7 @@ pub fn nixos_deploy_info(flake_reference: &FlakeReference) -> Result<ConfigInfo,
                 bootGrub = config.boot.loader.grub.enable;
                 bootSystemdGenerations = f config.boot.loader.systemd-boot.configurationLimit;
                 bootGrubGenerations = f config.boot.loader.grub.configurationLimit;
+                journaldExtraConfig = config.services.journald.extraConfig;
                 users = map (user: {
                     name = user.name;
                     extraGroups = user.extraGroups or [];
