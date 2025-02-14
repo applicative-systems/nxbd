@@ -66,6 +66,13 @@ pub fn get_standard_checks() -> Vec<ConfigCheck> {
                     });
                 }
 
+                if !config.nix_trusts_wheel {
+                    errors.push(CheckError {
+                        check_name: "Nix Trust".to_string(),
+                        message: "Wheel group is not trusted by nix (add '@wheel' to nix.settings.trusted-users)".to_string(),
+                    });
+                }
+
                 // Check if current user has SSH access
                 let current_user = &user_info.username;
                 let user = config.users.iter().find(|u| u.name == *current_user);

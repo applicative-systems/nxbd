@@ -31,7 +31,6 @@ pub struct ConfigInfo {
 #[allow(clippy::module_name_repetitions)]
 pub struct NixUser {
     pub name: String,
-    pub group: String,
     pub extra_groups: Vec<String>,
     #[serde(deserialize_with = "deserialize_ssh_keys")]
     pub ssh_keys: Vec<SshKeyInfo>,
@@ -66,7 +65,6 @@ pub fn nixos_deploy_info(flake_reference: &FlakeReference) -> Result<ConfigInfo,
                 nixTrustsWheel = builtins.elem "@wheel" config.nix.settings.trusted-users;
                 users = map (user: {
                     name = user.name;
-                    group = user.group or "";
                     extraGroups = user.extraGroups or [];
                     sshKeys = user.openssh.authorizedKeys.keys or [];
                 }) normalUsers;
