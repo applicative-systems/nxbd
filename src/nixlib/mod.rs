@@ -1,7 +1,6 @@
 pub mod configcheck;
 pub mod deployinfo;
 pub mod flakeref;
-mod outputhandling;
 pub mod sshkeys;
 pub mod userinfo;
 
@@ -76,9 +75,9 @@ pub fn toplevel_output_path(flake_reference: &FlakeReference) -> Result<String, 
         return Err(NixError::Build);
     }
 
-    let output_path = outputhandling::single_nix_build_output(&build_output.stdout)
-        .map_err(|_| NixError::Deserialization)?;
-    Ok(output_path)
+    let parsed: Vec<String> =
+        serde_json::from_slice(&build_output.stdout).map_err(|_| NixError::Deserialization)?;
+    Ok(parsed.into_iter().next().expect("Empty build output"))
 }
 
 pub fn activate_profile(
