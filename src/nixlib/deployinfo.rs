@@ -64,46 +64,41 @@ pub fn nixos_deploy_info(flake_reference: &FlakeReference) -> Result<ConfigInfo,
     // config that the checks would ever need. Maybe at some point in the future
     // this should be modularized.
     let nix_expr = r#"{ config, pkgs, ... }:
-          let
-            f = expr: let x = builtins.tryEval expr; in if x.success then x.value else null;
-            normalUsers = builtins.filter
+        {
+            fqdnOrHostName = config.networking.fqdnOrHostName;
+            fqdn = config.networking.fqdn;
+            wheelNeedsPassword = config.security.sudo.wheelNeedsPassword;
+            sshEnabled = config.services.openssh.enable;
+            sudoEnabled = config.security.sudo.enable;
+            nixTrustsWheel = builtins.elem "@wheel" config.nix.settings.trusted-users;
+            bootSystemd = config.boot.loader.systemd-boot.enable;
+            bootGrub = config.boot.loader.grub.enable;
+            bootSystemdGenerations = config.boot.loader.systemd-boot.configurationLimit;
+            bootGrubGenerations = config.boot.loader.grub.configurationLimit;
+            journaldExtraConfig = config.services.journald.extraConfig;
+            nixExtraOptions = config.nix.extraOptions;
+            docNixosEnabled = config.documentation.nixos.enable;
+            docEnable = config.documentation.enable;
+            docDevEnable = config.documentation.dev.enable;
+            docDocEnable = config.documentation.doc.enable;
+            docInfoEnable = config.documentation.info.enable;
+            docManEnable = config.documentation.man.enable;
+            isX86 = pkgs.stdenv.hostPlatform.isx86;
+            intelMicrocode = config.hardware.cpu.intel.updateMicrocode;
+            amdMicrocode = config.hardware.cpu.amd.updateMicrocode;
+            nginxEnabled = config.services.nginx.enable;
+            nginxBrotli = config.services.nginx.recommendedBrotliSettings;
+            nginxGzip = config.services.nginx.recommendedGzipSettings;
+            nginxOptimisation = config.services.nginx.recommendedOptimisation;
+            nginxProxy = config.services.nginx.recommendedProxySettings;
+            nginxTls = config.services.nginx.recommendedTlsSettings;
+            users = map (user: {
+                inherit (user) name extraGroups;
+                sshKeys = user.openssh.authorizedKeys.keys or [];
+            }) (builtins.filter
                 (user: (user.isNormalUser or false))
-                (builtins.attrValues config.users.users);
-          in
-            {
-                fqdnOrHostName = f config.networking.fqdnOrHostName;
-                fqdn = f config.networking.fqdn;
-                wheelNeedsPassword = config.security.sudo.wheelNeedsPassword;
-                sshEnabled = config.services.openssh.enable;
-                sudoEnabled = config.security.sudo.enable;
-                nixTrustsWheel = builtins.elem "@wheel" config.nix.settings.trusted-users;
-                bootSystemd = config.boot.loader.systemd-boot.enable;
-                bootGrub = config.boot.loader.grub.enable;
-                bootSystemdGenerations = f config.boot.loader.systemd-boot.configurationLimit;
-                bootGrubGenerations = f config.boot.loader.grub.configurationLimit;
-                journaldExtraConfig = config.services.journald.extraConfig;
-                nixExtraOptions = config.nix.extraOptions;
-                docNixosEnabled = config.documentation.nixos.enable;
-                docEnable = config.documentation.enable;
-                docDevEnable = config.documentation.dev.enable;
-                docDocEnable = config.documentation.doc.enable;
-                docInfoEnable = config.documentation.info.enable;
-                docManEnable = config.documentation.man.enable;
-                isX86 = pkgs.stdenv.hostPlatform.isx86;
-                intelMicrocode = config.hardware.cpu.intel.updateMicrocode;
-                amdMicrocode = config.hardware.cpu.amd.updateMicrocode;
-                nginxEnabled = config.services.nginx.enable;
-                nginxBrotli = config.services.nginx.recommendedBrotliSettings;
-                nginxGzip = config.services.nginx.recommendedGzipSettings;
-                nginxOptimisation = config.services.nginx.recommendedOptimisation;
-                nginxProxy = config.services.nginx.recommendedProxySettings;
-                nginxTls = config.services.nginx.recommendedTlsSettings;
-                users = map (user: {
-                    name = user.name;
-                    extraGroups = user.extraGroups or [];
-                    sshKeys = user.openssh.authorizedKeys.keys or [];
-                }) normalUsers;
-            }"#;
+                (builtins.attrValues config.users.users));
+        }"#;
 
     let output = std::process::Command::new("nix")
         .args([
