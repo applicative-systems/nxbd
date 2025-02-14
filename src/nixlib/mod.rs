@@ -7,6 +7,7 @@ pub mod userinfo;
 
 use std::process;
 use std::str;
+use which::which;
 
 pub use flakeref::FlakeReference;
 
@@ -53,18 +54,27 @@ pub fn nixos_configuration_flakerefs(flake_url: &str) -> Result<Vec<FlakeReferen
 }
 
 pub fn toplevel_output_path(flake_reference: &FlakeReference) -> Result<String, NixError> {
-    let build_output = process::Command::new("nom")
-        .args([
-            "build",
-            "--json",
-            &format!(
-                "{0}#nixosConfigurations.\"{1}\".config.system.build.toplevel",
-                flake_reference.url, flake_reference.attribute
-            ),
-        ])
+    let (cmd, mut args) = match which("nom") {
+        Ok(_) => ("nom", vec!["build"]),
+        Err(_) => ("nix", vec!["build", "--no-link"]),
+    };
+
+    let target = format!(
+        "{0}#nixosConfigurations.\"{1}\".config.system.build.toplevel",
+        flake_reference.url, flake_reference.attribute
+    );
+
+    args.extend(["--json", &target]);
+
+    let build_output = process::Command::new(cmd)
+        .args(args)
         .stderr(process::Stdio::inherit())
         .output()
         .map_err(|_| NixError::Build)?;
+
+    if !build_output.status.success() {
+        return Err(NixError::Build);
+    }
 
     let output_path = outputhandling::single_nix_build_output(&build_output.stdout)
         .map_err(|_| NixError::Deserialization)?;
