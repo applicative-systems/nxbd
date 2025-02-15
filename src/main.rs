@@ -114,7 +114,7 @@ fn main() -> Result<(), libnxbd::NixError> {
                                         &host,
                                         !user_info.can_build_natively(&deploy_info.system),
                                     ),
-                                    None => Err(libnxbd::NixError::NoHostName),
+                                    _ => Err(libnxbd::NixError::NoHostName),
                                 }
                             });
                         (sa.clone(), result)
@@ -132,7 +132,7 @@ fn main() -> Result<(), libnxbd::NixError> {
         Command::SwitchLocal { system } => {
             let system_attribute = match system {
                 Some(s) => s,
-                None => {
+                _ => {
                     let hostname = unistd::gethostname()
                         .expect("Failed getting hostname")
                         .into_string()
