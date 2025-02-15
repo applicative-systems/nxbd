@@ -178,9 +178,9 @@ pub struct RemoteBuilder {
     pub system: String,
 }
 
-fn get_nix_config_value(key: &str) -> Result<String, NixError> {
+fn get_nix_config_value(key: &str) -> Result<Value, NixError> {
     let output = process::Command::new("nix")
-        .args(["show-config", "--json"])
+        .args(["config", "show", "--json"])
         .output()
         .map_err(|_| NixError::Eval("Failed to execute nix show-config".to_string()))?;
 
@@ -193,16 +193,25 @@ fn get_nix_config_value(key: &str) -> Result<String, NixError> {
     config
         .get(key)
         .and_then(|s| s.get("value"))
-        .and_then(|v| v.as_str())
-        .map(String::from)
         .ok_or_else(|| NixError::Eval(format!("{key} not found in nix config")))
+        .cloned()
 }
 
 pub fn get_system() -> Result<(String, Vec<String>), NixError> {
-    let system = get_nix_config_value("system")?;
+    let system = get_nix_config_value("system")?
+        .as_str()
+        .ok_or_else(|| NixError::Eval("system is not a string".to_string()))?
+        .to_string();
+
     let extra_platforms = get_nix_config_value("extra-platforms")
-        .map(|platforms| {
-            serde_json::from_str::<Vec<String>>(&platforms).unwrap_or_else(|_| Vec::new())
+        .map(|v| {
+            v.as_array()
+                .map(|arr| {
+                    arr.iter()
+                        .filter_map(|v| v.as_str().map(String::from))
+                        .collect()
+                })
+                .unwrap_or_default()
         })
         .unwrap_or_default();
 
@@ -210,7 +219,10 @@ pub fn get_system() -> Result<(String, Vec<String>), NixError> {
 }
 
 pub fn get_remote_builders() -> Result<Vec<RemoteBuilder>, NixError> {
-    let builders_value = get_nix_config_value("builders")?;
+    let builders_value = get_nix_config_value("builders")?
+        .as_str()
+        .ok_or_else(|| NixError::Eval("system is not a string".to_string()))?
+        .to_string();
 
     let builders_str = if builders_value.starts_with('@') {
         fs::read_to_string(&builders_value[1..]).map_err(|_| {
