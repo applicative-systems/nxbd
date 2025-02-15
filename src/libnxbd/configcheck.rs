@@ -118,7 +118,7 @@ pub fn get_standard_checks() -> Vec<ConfigCheck> {
             |config, _user_info| {
                 let mut errors = Vec::new();
 
-                if config.sudo_wheel_only {
+                if !config.sudo_wheel_only {
                     errors.push(CheckError {
                         check_name: "Sudo Wheel Only".to_string(),
                         message: "Only users of the wheel group should be allowed to use sudo. Consider setting security.sudo.execWheelOnly".to_string(),
