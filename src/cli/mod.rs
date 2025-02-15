@@ -22,6 +22,8 @@ pub enum Command {
     SwitchLocal {
         #[arg(value_parser = libnxbd::flakeref::parse_flake_reference)]
         system: Option<libnxbd::FlakeReference>,
+        #[arg(long)]
+        ignore_hostname: bool,
     },
     Check {
         #[arg(value_parser = libnxbd::flakeref::parse_flake_reference)]

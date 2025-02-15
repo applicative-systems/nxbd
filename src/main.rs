@@ -132,23 +132,38 @@ fn main() -> Result<(), libnxbd::NixError> {
                 }
             }
         }
-        Command::SwitchLocal { system } => {
+        Command::SwitchLocal {
+            system,
+            ignore_hostname,
+        } => {
+            let local_hostname = unistd::gethostname()
+                .expect("Failed getting hostname")
+                .into_string()
+                .expect("Hostname is no valid UTF-8");
+
             let system_attribute = match system {
                 Some(s) => s,
-                _ => {
-                    let hostname = unistd::gethostname()
-                        .expect("Failed getting hostname")
-                        .into_string()
-                        .expect("Hostname is no valid UTF-8");
-                    &FlakeReference {
-                        url: ".".to_string(),
-                        attribute: hostname,
-                    }
-                }
+                _ => &FlakeReference {
+                    url: ".".to_string(),
+                    attribute: local_hostname.clone(),
+                },
             };
             println!("Switching system: {system_attribute}");
 
             let deploy_info = nixos_deploy_info(&system_attribute)?;
+
+            // Check hostname match unless ignored
+            if !ignore_hostname {
+                if let Some(config_hostname) = &deploy_info.fqdn_or_host_name {
+                    if config_hostname != &local_hostname {
+                        return Err(NixError::Eval(format!(
+                            "Hostname mismatch: system config has '{}' but local system is '{}'. Use --ignore-hostname to ignore this check.",
+                            config_hostname, local_hostname
+                        )));
+                    }
+                }
+            }
+
             let toplevel = deploy_info.toplevel_out;
             println!("Store path is [{toplevel}]");
             activate_profile(&toplevel, true, None)?;
