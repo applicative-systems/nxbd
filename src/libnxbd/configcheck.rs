@@ -700,8 +700,10 @@ pub fn save_failed_checks_to_ignore_file(
     path: &str,
     system_results: &[(&FlakeReference, Vec<(String, bool, Vec<(String, bool)>)>)],
 ) -> Result<(), CheckFileError> {
-    let mut ignore_map: HashMap<String, HashMap<String, Vec<String>>> = HashMap::new();
+    // Start with existing ignored checks if available
+    let mut ignore_map = load_ignored_checks(path).unwrap_or_else(|| HashMap::new());
 
+    // Update map with new results
     for (system, results) in system_results {
         let mut system_map: HashMap<String, Vec<String>> = HashMap::new();
 
@@ -718,7 +720,11 @@ pub fn save_failed_checks_to_ignore_file(
         }
 
         if !system_map.is_empty() {
+            // Replace or insert the system's ignored checks
             ignore_map.insert(system.to_string(), system_map);
+        } else {
+            // If no failures for this system, remove it from ignored checks
+            ignore_map.remove(&system.to_string());
         }
     }
 
