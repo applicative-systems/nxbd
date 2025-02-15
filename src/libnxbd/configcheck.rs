@@ -174,6 +174,33 @@ pub fn get_standard_checks() -> Vec<CheckGroup> {
                         }
                     },
                 ),
+                Check::new(
+                    "user_in_wheel",
+                    "Current user must be in wheel group",
+                    "Add your user to the wheel group",
+                    |config, user_info| {
+                        let current_user = &user_info.username;
+                        match config.users.iter().find(|u| u.name == *current_user) {
+                            None => Err(CheckError {
+                                check_name: "Wheel Group".to_string(),
+                                message: format!("User '{}' does not exist on target system", current_user),
+                            }),
+                            Some(user) => {
+                                if !user.extra_groups.contains(&"wheel".to_string()) {
+                                    Err(CheckError {
+                                        check_name: "Wheel Group".to_string(),
+                                        message: format!(
+                                            "User '{}' is not in the wheel group",
+                                            current_user
+                                        ),
+                                    })
+                                } else {
+                                    Ok(())
+                                }
+                            }
+                        }
+                    },
+                ),
             ],
         },
         CheckGroup {
