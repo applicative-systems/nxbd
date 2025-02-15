@@ -204,8 +204,8 @@ pub fn get_standard_checks() -> Vec<ConfigCheck> {
             },
         ),
         ConfigCheck::new(
-            "Journald Space Management",
-            "Checks if journald has proper disk space limits configured",
+            "Disk Space Management",
+            "Checks whether the optimisations and limits for disk space are configured",
             |config, _user_info| {
                 let mut errors = Vec::new();
                 let config_str = &config.journald_extra_config;
@@ -218,6 +218,13 @@ pub fn get_standard_checks() -> Vec<ConfigCheck> {
                     errors.push(CheckError {
                         check_name: "Journald Limits".to_string(),
                         message: "No journald space limits configured. Set either 'SystemKeepFree' or both 'SystemMaxUse' and 'SystemMaxFileSize'".to_string(),
+                    });
+                }
+
+                if !config.nix_optimise_automatic && !config.nix_auto_optimise_store{
+                    errors.push(CheckError {
+                        check_name: "Nix store optimisation".to_string(),
+                        message: "Nix store optimisation is disabled. Set either nix.settings.auto-optimise-store or nix.optimise.automatic".to_string(),
                     });
                 }
 
