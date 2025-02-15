@@ -361,5 +361,24 @@ pub fn get_standard_checks() -> Vec<ConfigCheck> {
                 }
             },
         ),
+        ConfigCheck::new(
+            "Garbage Collection",
+            "Checks whether the Nix garbage collection is configured correctly",
+            |config, _user_info| {
+                let mut errors = Vec::new();
+                if !config.nix_gc {
+                    errors.push(CheckError {
+                        check_name: "Garbage Collection".to_string(),
+                        message: "Garbage Collection is not enabled. Consider setting nix.gc.automatic = true".to_string(),
+                    });
+                }
+
+                if errors.is_empty() {
+                    Ok(())
+                } else {
+                    Err(errors)
+                }
+            },
+        ),
     ]
 }
