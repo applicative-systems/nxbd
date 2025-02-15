@@ -39,6 +39,7 @@ pub struct ConfigInfo {
     pub system: String,
     pub users: Vec<NixUser>,
     pub nix_gc: bool,
+    pub log_refused_connections: bool,
 }
 
 #[derive(Deserialize, Debug)]
@@ -104,6 +105,7 @@ pub fn nixos_deploy_info(flake_reference: &FlakeReference) -> Result<ConfigInfo,
                 (user: (user.isNormalUser or false))
                 (builtins.attrValues config.users.users));
             nixGc = config.nix.gc.automatic;
+            logRefusedConnections = config.networking.firewall.logRefusedConnections;
         }"#;
 
     let output = std::process::Command::new("nix")

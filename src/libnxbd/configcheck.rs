@@ -133,6 +133,26 @@ pub fn get_standard_checks() -> Vec<ConfigCheck> {
             },
         ),
         ConfigCheck::new(
+            "Firewall settings",
+            "Check whether firewall is configured correctly",
+            |config, _user_info| {
+                let mut errors = Vec::new();
+
+                if config.log_refused_connections {
+                    errors.push(CheckError {
+                        check_name: "Log refused connections".to_string(),
+                        message: "Logging of refused connections should be disabled. Consider setting networking.firewall.logRefusedConnections = false".to_string(),
+                    });
+                }
+
+                if errors.is_empty() {
+                    Ok(())
+                } else {
+                    Err(errors)
+                }
+            },
+        ),
+        ConfigCheck::new(
             "Boot Configuration Limit",
             "Checks if system configuration generations are reasonably limited to prevent disk space waste",
             |config, _user_info| {
