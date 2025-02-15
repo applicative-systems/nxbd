@@ -36,6 +36,7 @@ pub struct ConfigInfo {
     pub nginx_proxy: bool,
     pub nginx_tls: bool,
     pub users: Vec<NixUser>,
+    pub nix_gc: bool,
 }
 
 #[derive(Deserialize, Debug)]
@@ -98,6 +99,7 @@ pub fn nixos_deploy_info(flake_reference: &FlakeReference) -> Result<ConfigInfo,
             }) (builtins.filter
                 (user: (user.isNormalUser or false))
                 (builtins.attrValues config.users.users));
+            nixGc = config.nix.gc.automatic;
         }"#;
 
     let output = std::process::Command::new("nix")

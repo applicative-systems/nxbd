@@ -205,7 +205,7 @@ pub fn get_standard_checks() -> Vec<ConfigCheck> {
                     }
                     if !features_line.contains("flakes") {
                         errors.push(CheckError {
-                            check_name: "Nix Features".to_string(), 
+                            check_name: "Nix Features".to_string(),
                             message: "Missing required nix feature 'flakes'. Add it to experimental-features in nix.extraOptions".to_string(),
                         });
                     }
@@ -332,6 +332,25 @@ pub fn get_standard_checks() -> Vec<ConfigCheck> {
                             message: "TLS settings not enabled. Consider setting services.nginx.recommendedTlsSettings = true".to_string(),
                         });
                     }
+                }
+
+                if errors.is_empty() {
+                    Ok(())
+                } else {
+                    Err(errors)
+                }
+            },
+        ),
+        ConfigCheck::new(
+            "Garbage Collection",
+            "Checks whether the Nix garbage collection is configured correctly",
+            |config, _user_info| {
+                let mut errors = Vec::new();
+                if !config.nix_gc {
+                    errors.push(CheckError {
+                        check_name: "Garbage Collection".to_string(),
+                        message: "Garbage Collection is not enabled. Consider setting nix.gc.automatic = true".to_string(),
+                    });
                 }
 
                 if errors.is_empty() {
