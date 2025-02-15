@@ -58,6 +58,7 @@
             inputsFrom = [ config.packages.nxbd ];
             nativeBuildInputs = [
               pkgs.cargo-edit
+              pkgs.cargo-watch
               pkgs.clippy
               treefmtEval.config.build.wrapper
             ];
