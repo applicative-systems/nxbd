@@ -4,7 +4,7 @@ mod libnxbd;
 use crate::cli::{Cli, Command};
 use clap::Parser;
 use libnxbd::{
-    configcheck::get_standard_checks,
+    configcheck::{get_standard_checks, run_all_checks},
     nixcommands::{
         activate_profile, copy_to_host, nixos_configuration_flakerefs, realise_drv_remotely,
         realise_toplevel_output_path, switch_to_configuration,
@@ -16,8 +16,13 @@ use libnxbd::{
 use nix::unistd;
 use owo_colors::OwoColorize;
 
-// Add a constant for the arrow prefix
-const ARROW: &str = "→";
+fn passed_symbol(passed: bool) -> String {
+    if passed {
+        "✓".green().to_string()
+    } else {
+        "✗".red().to_string()
+    }
+}
 
 fn flakerefs_or_default(refs: &[FlakeReference]) -> Result<Vec<FlakeReference>, libnxbd::NixError> {
     if refs.is_empty() {
@@ -35,10 +40,7 @@ fn deploy_remote(
     build_remote: bool,
 ) -> Result<(), libnxbd::NixError> {
     if build_remote {
-        println!(
-            "{}",
-            format!("{} Building on remote host: {}", ARROW, host).white()
-        );
+        println!("{}", format!("→ Building on remote host: {}", host).white());
         copy_to_host(&toplevel_drv, host)?;
         println!("lol");
         realise_drv_remotely(&toplevel_drv, host)?;
@@ -68,8 +70,7 @@ fn main() -> Result<(), libnxbd::NixError> {
                 println!(
                     "{}",
                     format!(
-                        "{} Building systems: {}",
-                        ARROW,
+                        "→ Building systems: {}",
                         system_attributes
                             .iter()
                             .map(|f| f.to_string())
@@ -81,17 +82,10 @@ fn main() -> Result<(), libnxbd::NixError> {
             }
             for system in &system_attributes {
                 let result = nixos_deploy_info(system)?;
+                println!("{}", format!("→ Building system: {}", system).white());
                 println!(
                     "{}",
-                    format!("{} Building system: {}", ARROW, system).white()
-                );
-                println!(
-                    "{}",
-                    format!(
-                        "{} Built store path for {}: {}",
-                        ARROW, system, result.toplevel_out
-                    )
-                    .white()
+                    format!("→ Built store path for {}: {}", system, result.toplevel_out).white()
                 );
             }
         }
@@ -158,81 +152,18 @@ fn main() -> Result<(), libnxbd::NixError> {
             switch_to_configuration(&toplevel, "switch", true, None)?;
         }
         Command::Check { systems, verbose } => {
-            if *verbose {
-                println!("Current user: {}", user_info.username);
-                println!("\nLoaded SSH keys in agent:");
-                if user_info.ssh_keys.is_empty() {
-                    println!("  No SSH keys loaded in ssh-agent");
-                } else {
-                    for key in &user_info.ssh_keys {
-                        println!("Key:     {}", key);
-                    }
-                }
-            }
-
             let system_attributes = flakerefs_or_default(systems)?;
-            if *verbose {
-                println!("\nSystem Configurations:");
-            }
+            println!("\nSystem Configurations:");
 
             for system in &system_attributes {
                 println!("\n=== {} ===", system.to_string().cyan().bold());
                 match nixos_deploy_info(system) {
                     Ok(info) => {
-                        if *verbose {
-                            let hostname = info
-                                .fqdn_or_host_name
-                                .clone()
-                                .unwrap_or_else(|| "unknown".to_string());
-                            println!("Hostname: {}", hostname);
-                            println!(
-                                "SSH Service: {}",
-                                if info.ssh_enabled {
-                                    "enabled"
-                                } else {
-                                    "disabled"
-                                }
-                            );
-                            println!(
-                                "Wheel group sudo: {}",
-                                if info.wheel_needs_password {
-                                    "requires password"
-                                } else {
-                                    "passwordless"
-                                }
-                            );
-
-                            println!("\nUsers with SSH access:");
-                            for user in &info.users {
-                                if !user.ssh_keys.is_empty() {
-                                    println!(
-                                        "\n  User: {} {}",
-                                        user.name,
-                                        if user.extra_groups.contains(&"wheel".to_string()) {
-                                            "(wheel)"
-                                        } else {
-                                            ""
-                                        }
-                                    );
-                                    println!("  Authorized keys:");
-                                    for key in &user.ssh_keys {
-                                        println!("    {}", key);
-                                    }
-                                }
-                            }
-                        }
-
-                        println!("\nConfiguration Checks:");
-                        for check in get_standard_checks() {
-                            print!("  {} ... ", check.name);
-                            match check.check(&info, &user_info) {
-                                Ok(()) => println!("{}", "✓".green()),
-                                Err(errors) => {
-                                    println!("{}", "✗".red());
-                                    for error in errors {
-                                        println!("    - {}", error);
-                                    }
-                                }
+                        let results = run_all_checks(&info, &user_info);
+                        for (group_id, group_passed, check_results) in results {
+                            println!("{}: {}", group_id, passed_symbol(group_passed));
+                            for (check_id, check_passed) in check_results {
+                                println!("  {}: {}", check_id, passed_symbol(check_passed));
                             }
                         }
                     }
@@ -245,9 +176,22 @@ fn main() -> Result<(), libnxbd::NixError> {
         }
         Command::Checks => {
             println!("Available configuration checks:\n");
-            for check in get_standard_checks() {
-                println!("{}", check.name.cyan().bold());
-                println!("  {}\n", check.description);
+            for group in get_standard_checks() {
+                println!(
+                    "\n{} - {}\n{}\n",
+                    group.id.cyan().bold(),
+                    group.name.bold(),
+                    group.description.dimmed()
+                );
+
+                for check in group.checks {
+                    println!(
+                        "  {} - {}\n    {}\n",
+                        check.id.yellow(),
+                        check.description,
+                        check.advice.dimmed()
+                    );
+                }
             }
         }
     }
