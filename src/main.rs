@@ -7,7 +7,7 @@ use libnxbd::{
     configcheck::get_standard_checks,
     nixcommands::{
         activate_profile, copy_to_host, nixos_configuration_flakerefs, realise_drv_remotely,
-        realise_toplevel_output_path, switch_to_configuration, toplevel_derivation_paths,
+        realise_toplevel_output_path, switch_to_configuration,
     },
     nixosattributes::nixos_deploy_info,
     userinfo::UserInfo,
@@ -29,11 +29,11 @@ fn flakerefs_or_default(refs: &[FlakeReference]) -> Result<Vec<FlakeReference>, 
 
 fn deploy_remote(
     system_attribute: &FlakeReference,
+    toplevel_out: &str,
+    toplevel_drv: &str,
     host: &str,
     build_remote: bool,
 ) -> Result<(), libnxbd::NixError> {
-    let (toplevel_out, toplevel_drv) = toplevel_derivation_paths(system_attribute)?;
-
     if build_remote {
         println!(
             "{}",
@@ -85,10 +85,13 @@ fn main() -> Result<(), libnxbd::NixError> {
                     "{}",
                     format!("{} Building system: {}", ARROW, system).white()
                 );
-                let (toplevel, _) = toplevel_derivation_paths(system)?;
                 println!(
                     "{}",
-                    format!("{} Built store path for {}: {}", ARROW, system, toplevel).white()
+                    format!(
+                        "{} Built store path for {}: {}",
+                        ARROW, system, result.toplevel_out
+                    )
+                    .white()
                 );
             }
         }
@@ -112,6 +115,8 @@ fn main() -> Result<(), libnxbd::NixError> {
                                 match deploy_info.fqdn_or_host_name {
                                     Some(host) => deploy_remote(
                                         sa,
+                                        &deploy_info.toplevel_out,
+                                        &deploy_info.toplevel_drv,
                                         &host,
                                         !user_info.can_build_natively(&deploy_info.system),
                                     ),
@@ -146,7 +151,8 @@ fn main() -> Result<(), libnxbd::NixError> {
             };
             println!("Switching system: {system_attribute}");
 
-            let (toplevel, _) = toplevel_derivation_paths(system_attribute)?;
+            let deploy_info = nixos_deploy_info(&system_attribute)?;
+            let toplevel = deploy_info.toplevel_out;
             println!("Store path is [{toplevel}]");
             activate_profile(&toplevel, true, None)?;
             switch_to_configuration(&toplevel, "switch", true, None)?;

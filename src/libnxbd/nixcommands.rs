@@ -239,44 +239,6 @@ pub fn get_remote_builders() -> Result<Vec<RemoteBuilder>, NixError> {
     Ok(builders)
 }
 
-pub fn toplevel_derivation_paths(
-    flake_reference: &FlakeReference,
-) -> Result<(String, String), NixError> {
-    let output = process::Command::new("nix")
-        .args([
-            "eval",
-            "--json",
-            &format!(
-                "{0}#nixosConfigurations.\"{1}\".config.system.build.toplevel",
-                flake_reference.url, flake_reference.attribute
-            ),
-            "--apply",
-            "out: { inherit out; drv = out.drvPath; }",
-        ])
-        .stderr(process::Stdio::inherit())
-        .output()
-        .map_err(|_| NixError::Eval("Failed to execute nix eval".to_string()))?;
-
-    if !output.status.success() {
-        return Err(NixError::Eval("Failed to get paths".to_string()));
-    }
-
-    let paths: serde_json::Value = serde_json::from_slice(&output.stdout)
-        .map_err(|_| NixError::Eval("Failed to parse JSON output".to_string()))?;
-
-    let out_path = paths
-        .get("out")
-        .and_then(|v| v.as_str())
-        .ok_or_else(|| NixError::Eval("Missing out path in output".to_string()))?;
-
-    let drv_path = paths
-        .get("drv")
-        .and_then(|v| v.as_str())
-        .ok_or_else(|| NixError::Eval("Missing drv path in output".to_string()))?;
-
-    Ok((out_path.to_string(), drv_path.to_string()))
-}
-
 pub fn realise_drv_remotely(drv_path: &str, host: &str) -> Result<String, NixError> {
     let output = process::Command::new("ssh")
         .args([host, "nix-store", "--realise", drv_path])
