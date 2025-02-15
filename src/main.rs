@@ -185,8 +185,7 @@ fn main() -> Result<(), libnxbd::NixError> {
                                         })
                                     {
                                         println!(
-                                            "    {} - {}\n      {}\n",
-                                            check_id.yellow(),
+                                            "    - {}\n      {}\n",
                                             check.description,
                                             check.advice.dimmed()
                                         );
