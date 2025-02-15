@@ -198,8 +198,13 @@ fn get_nix_config_value(key: &str) -> Result<String, NixError> {
         .ok_or_else(|| NixError::Eval(format!("{key} not found in nix config")))
 }
 
-pub fn get_system() -> Result<String, NixError> {
-    get_nix_config_value("system")
+pub fn get_system() -> Result<(String, Vec<String>), NixError> {
+    let system = get_nix_config_value("system")?;
+    let extra_platforms = get_nix_config_value("extra-platforms")
+        .map(|platforms| platforms.split_whitespace().map(String::from).collect())
+        .unwrap_or_default();
+
+    Ok((system, extra_platforms))
 }
 
 pub fn get_remote_builders() -> Result<Vec<RemoteBuilder>, NixError> {

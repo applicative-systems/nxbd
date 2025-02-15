@@ -8,6 +8,7 @@ pub struct UserInfo {
     pub username: String,
     pub ssh_keys: Vec<SshKeyInfo>,
     pub system: String,
+    pub extra_platforms: Vec<String>,
     pub remote_builders: Vec<RemoteBuilder>,
 }
 
@@ -29,13 +30,14 @@ impl UserInfo {
             })
             .unwrap_or_else(Vec::new);
 
-        let system = get_system()?;
+        let (system, extra_platforms) = get_system()?;
         let remote_builders = get_remote_builders()?;
 
         Ok(UserInfo {
             username,
             ssh_keys,
             system,
+            extra_platforms,
             remote_builders,
         })
     }
