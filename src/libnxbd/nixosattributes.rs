@@ -40,6 +40,8 @@ pub struct ConfigInfo {
     pub users: Vec<NixUser>,
     pub nix_gc: bool,
     pub log_refused_connections: bool,
+    pub nix_optimise_automatic: bool,
+    pub nix_auto_optimise_store: bool,
 }
 
 #[derive(Deserialize, Debug)]
@@ -106,6 +108,8 @@ pub fn nixos_deploy_info(flake_reference: &FlakeReference) -> Result<ConfigInfo,
                 (builtins.attrValues config.users.users));
             nixGc = config.nix.gc.automatic;
             logRefusedConnections = config.networking.firewall.logRefusedConnections;
+            nixOptimiseAutomatic = config.nix.optimise.automatic;
+            nixAutoOptimiseStore = config.nix.settings.auto-optimise-store;
         }"#;
 
     let output = std::process::Command::new("nix")
