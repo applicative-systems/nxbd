@@ -113,6 +113,26 @@ pub fn get_standard_checks() -> Vec<ConfigCheck> {
             },
         ),
         ConfigCheck::new(
+            "Sudo Security Settings",
+            "Check if sudo is configured securely",
+            |config, _user_info| {
+                let mut errors = Vec::new();
+
+                if config.sudo_wheel_only {
+                    errors.push(CheckError {
+                        check_name: "Sudo Wheel Only".to_string(),
+                        message: "Only users of the wheel group should be allowed to use sudo. Consider setting security.sudo.execWheelOnly".to_string(),
+                    });
+                }
+
+                if errors.is_empty() {
+                    Ok(())
+                } else {
+                    Err(errors)
+                }
+            },
+        ),
+        ConfigCheck::new(
             "Boot Configuration Limit",
             "Checks if system configuration generations are reasonably limited to prevent disk space waste",
             |config, _user_info| {
@@ -205,7 +225,7 @@ pub fn get_standard_checks() -> Vec<ConfigCheck> {
                     }
                     if !features_line.contains("flakes") {
                         errors.push(CheckError {
-                            check_name: "Nix Features".to_string(), 
+                            check_name: "Nix Features".to_string(),
                             message: "Missing required nix feature 'flakes'. Add it to experimental-features in nix.extraOptions".to_string(),
                         });
                     }
