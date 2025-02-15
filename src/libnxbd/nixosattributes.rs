@@ -35,6 +35,7 @@ pub struct ConfigInfo {
     pub nginx_optimisation: bool,
     pub nginx_proxy: bool,
     pub nginx_tls: bool,
+    pub system: String,
     pub users: Vec<NixUser>,
 }
 
@@ -65,6 +66,7 @@ pub fn nixos_deploy_info(flake_reference: &FlakeReference) -> Result<ConfigInfo,
     // this should be modularized.
     let nix_expr = r#"{ config, pkgs, ... }:
         {
+            inherit (pkgs) system;
             fqdnOrHostName = config.networking.fqdnOrHostName;
             fqdn = config.networking.fqdn;
             wheelNeedsPassword = config.security.sudo.wheelNeedsPassword;

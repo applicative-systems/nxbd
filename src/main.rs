@@ -6,8 +6,8 @@ use clap::Parser;
 use libnxbd::{
     configcheck::get_standard_checks,
     nixcommands::{
-        activate_profile, copy_to_host, nixos_configuration_flakerefs, switch_to_configuration,
-        toplevel_output_path,
+        activate_profile, copy_to_host, get_remote_builders, get_system,
+        nixos_configuration_flakerefs, switch_to_configuration, toplevel_output_path,
     },
     nixosattributes::nixos_deploy_info,
     userinfo::UserInfo,
@@ -37,6 +37,8 @@ fn deploy_remote(system_attribute: &FlakeReference, host: &str) -> Result<(), li
 fn main() -> Result<(), libnxbd::NixError> {
     let cli = Cli::parse();
 
+    let user_info = UserInfo::collect()?;
+
     match &cli.command {
         Command::Build { systems } => {
             let system_attributes = flakerefs_or_default(systems)?;
@@ -56,6 +58,12 @@ fn main() -> Result<(), libnxbd::NixError> {
                 );
             }
             for system in &system_attributes {
+                let result = nixos_deploy_info(system)?;
+                let remote_build = result.system != user_info.system
+                    && !user_info
+                        .remote_builders
+                        .iter()
+                        .any(|rb| rb.system == result.system);
                 println!(
                     "{}",
                     format!("{} Building system: {}", ARROW, system).white()
@@ -123,15 +131,13 @@ fn main() -> Result<(), libnxbd::NixError> {
             switch_to_configuration(&toplevel, "switch", true, None)?;
         }
         Command::Check { systems, verbose } => {
-            let agent_info = UserInfo::collect();
-
             if *verbose {
-                println!("Current user: {}", agent_info.username);
+                println!("Current user: {}", user_info.username);
                 println!("\nLoaded SSH keys in agent:");
-                if agent_info.ssh_keys.is_empty() {
+                if user_info.ssh_keys.is_empty() {
                     println!("  No SSH keys loaded in ssh-agent");
                 } else {
-                    for key in &agent_info.ssh_keys {
+                    for key in &user_info.ssh_keys {
                         println!("Key:     {}", key);
                     }
                 }
@@ -192,7 +198,7 @@ fn main() -> Result<(), libnxbd::NixError> {
                         println!("\nConfiguration Checks:");
                         for check in get_standard_checks() {
                             print!("  {} ... ", check.name);
-                            match check.check(&info, &agent_info) {
+                            match check.check(&info, &user_info) {
                                 Ok(()) => println!("{}", "✓".green()),
                                 Err(errors) => {
                                     println!("{}", "✗".red());

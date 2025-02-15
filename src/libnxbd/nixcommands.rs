@@ -1,5 +1,7 @@
 use serde_json;
+use serde_json::Value;
 use std::fmt;
+use std::fs;
 use std::process;
 use std::str;
 use which::which;
@@ -173,4 +175,70 @@ pub fn copy_to_host(toplevel_path: &str, host: &str) -> Result<(), NixError> {
         .output()
         .map_err(|_| NixError::ConfigSwitch)
         .map(|_| ())
+}
+
+#[derive(Debug)]
+pub struct RemoteBuilder {
+    pub ssh_host: String,
+    pub system: String,
+}
+
+fn get_nix_config_value(key: &str) -> Result<String, NixError> {
+    let output = process::Command::new("nix")
+        .args(["show-config", "--json"])
+        .output()
+        .map_err(|_| NixError::Eval("Failed to execute nix show-config".to_string()))?;
+
+    let config: Value = serde_json::from_str(
+        str::from_utf8(&output.stdout)
+            .map_err(|_| NixError::Eval("Invalid UTF-8 in nix show-config output".to_string()))?,
+    )
+    .map_err(|_| NixError::Eval("Failed to parse JSON output".to_string()))?;
+
+    config
+        .get(key)
+        .and_then(|s| s.get("value"))
+        .and_then(|v| v.as_str())
+        .map(String::from)
+        .ok_or_else(|| NixError::Eval(format!("{key} not found in nix config")))
+}
+
+pub fn get_system() -> Result<String, NixError> {
+    get_nix_config_value("system")
+}
+
+pub fn get_remote_builders() -> Result<Vec<RemoteBuilder>, NixError> {
+    let builders_value = get_nix_config_value("builders")?;
+
+    let builders_str = if builders_value.starts_with('@') {
+        fs::read_to_string(&builders_value[1..]).map_err(|_| {
+            NixError::Eval(format!(
+                "Failed to read builders file: {}",
+                &builders_value[1..]
+            ))
+        })?
+    } else {
+        builders_value
+    };
+
+    let builders = builders_str
+        .split(|c| c == ';' || c == '\n')
+        .filter_map(|line| {
+            let line = line.trim();
+            if line.is_empty() {
+                return None;
+            }
+
+            let parts: Vec<&str> = line.split_whitespace().collect();
+            match parts.as_slice() {
+                [ssh_host, system] => Some(RemoteBuilder {
+                    ssh_host: ssh_host.to_string(),
+                    system: system.to_string(),
+                }),
+                _ => None,
+            }
+        })
+        .collect();
+
+    Ok(builders)
 }
