@@ -160,7 +160,13 @@ fn main() -> Result<(), libnxbd::NixError> {
                 }
             }
 
-            let toplevel = deploy_info.toplevel_out;
+            let toplevel = realise_toplevel_output_path(system_attribute)?;
+            // We should change this in a way that realise_toplevel_output_path actually accepts the .drv file, but that may be impeding to nix-output-monitor
+            assert_eq!(
+                toplevel, deploy_info.toplevel_out,
+                "Built output path does not match evaluated output path"
+            );
+
             println!("Store path is [{toplevel}]");
             activate_profile(&toplevel, true, None)?;
             switch_to_configuration(&toplevel, "switch", true, None)?;
