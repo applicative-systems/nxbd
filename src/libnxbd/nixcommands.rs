@@ -16,6 +16,7 @@ pub enum NixError {
     ProfileSet,
     Deserialization,
     NoHostName,
+    Copy,
 }
 
 impl fmt::Display for NixError {
@@ -27,6 +28,7 @@ impl fmt::Display for NixError {
             Self::ProfileSet => write!(f, "Failed to set profile"),
             Self::Deserialization => write!(f, "Failed to parse output"),
             Self::NoHostName => write!(f, "No hostname configured"),
+            Self::Copy => write!(f, "Failed to copy to host"),
         }
     }
 }
@@ -63,7 +65,7 @@ pub fn nixos_configuration_flakerefs(flake_url: &str) -> Result<Vec<FlakeReferen
     Ok(flakerefs)
 }
 
-pub fn toplevel_output_path(flake_reference: &FlakeReference) -> Result<String, NixError> {
+pub fn realise_toplevel_output_path(flake_reference: &FlakeReference) -> Result<String, NixError> {
     let (cmd, mut args) = match which("nom") {
         Ok(_) => ("nom", vec!["build"]),
         Err(_) => ("nix", vec!["build", "--no-link"]),
@@ -161,19 +163,13 @@ pub fn switch_to_configuration(
         .map(|_| ())
 }
 
-pub fn copy_to_host(toplevel_path: &str, host: &str) -> Result<(), NixError> {
+pub fn copy_to_host(path: &str, host: &str) -> Result<(), NixError> {
     let target = format!("ssh://{}", host);
     process::Command::new("nix")
-        .args([
-            "copy",
-            "--substitute-on-destination",
-            "--to",
-            &target,
-            toplevel_path,
-        ])
+        .args(["copy", "--substitute-on-destination", "--to", &target, path])
         .stderr(process::Stdio::inherit())
         .output()
-        .map_err(|_| NixError::ConfigSwitch)
+        .map_err(|_| NixError::Copy)
         .map(|_| ())
 }
 
@@ -241,4 +237,65 @@ pub fn get_remote_builders() -> Result<Vec<RemoteBuilder>, NixError> {
         .collect();
 
     Ok(builders)
+}
+
+pub fn toplevel_derivation_paths(
+    flake_reference: &FlakeReference,
+) -> Result<(String, String), NixError> {
+    let output = process::Command::new("nix")
+        .args([
+            "eval",
+            "--json",
+            &format!(
+                "{0}#nixosConfigurations.\"{1}\".config.system.build.toplevel",
+                flake_reference.url, flake_reference.attribute
+            ),
+            "--apply",
+            "out: { inherit out; drv = out.drvPath; }",
+        ])
+        .stderr(process::Stdio::inherit())
+        .output()
+        .map_err(|_| NixError::Eval("Failed to execute nix eval".to_string()))?;
+
+    if !output.status.success() {
+        return Err(NixError::Eval("Failed to get paths".to_string()));
+    }
+
+    let paths: serde_json::Value = serde_json::from_slice(&output.stdout)
+        .map_err(|_| NixError::Eval("Failed to parse JSON output".to_string()))?;
+
+    let out_path = paths
+        .get("out")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| NixError::Eval("Missing out path in output".to_string()))?;
+
+    let drv_path = paths
+        .get("drv")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| NixError::Eval("Missing drv path in output".to_string()))?;
+
+    Ok((out_path.to_string(), drv_path.to_string()))
+}
+
+pub fn realise_drv_remotely(drv_path: &str, host: &str) -> Result<String, NixError> {
+    let output = process::Command::new("ssh")
+        .args([host, "nix-store", "--realise", drv_path])
+        .stderr(process::Stdio::inherit())
+        .output()
+        .map_err(|_| NixError::Build)?;
+
+    if !output.status.success() {
+        return Err(NixError::Build);
+    }
+
+    let path = String::from_utf8(output.stdout)
+        .map_err(|_| NixError::Build)?
+        .trim()
+        .to_string();
+
+    if path.is_empty() {
+        return Err(NixError::Build);
+    }
+
+    Ok(path)
 }

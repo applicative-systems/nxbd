@@ -6,8 +6,8 @@ use clap::Parser;
 use libnxbd::{
     configcheck::get_standard_checks,
     nixcommands::{
-        activate_profile, copy_to_host, get_remote_builders, get_system,
-        nixos_configuration_flakerefs, switch_to_configuration, toplevel_output_path,
+        activate_profile, copy_to_host, nixos_configuration_flakerefs, realise_drv_remotely,
+        realise_toplevel_output_path, switch_to_configuration, toplevel_derivation_paths,
     },
     nixosattributes::nixos_deploy_info,
     userinfo::UserInfo,
@@ -27,11 +27,33 @@ fn flakerefs_or_default(refs: &[FlakeReference]) -> Result<Vec<FlakeReference>, 
     }
 }
 
-fn deploy_remote(system_attribute: &FlakeReference, host: &str) -> Result<(), libnxbd::NixError> {
-    let toplevel = toplevel_output_path(system_attribute)?;
-    copy_to_host(&toplevel, host)?;
-    activate_profile(&toplevel, true, Some(host))?;
-    switch_to_configuration(&toplevel, "switch", true, Some(host))
+fn deploy_remote(
+    system_attribute: &FlakeReference,
+    host: &str,
+    build_remote: bool,
+) -> Result<(), libnxbd::NixError> {
+    let (toplevel_out, toplevel_drv) = toplevel_derivation_paths(system_attribute)?;
+
+    if build_remote {
+        println!(
+            "{}",
+            format!("{} Building on remote host: {}", ARROW, host).white()
+        );
+        copy_to_host(&toplevel_drv, host)?;
+        println!("lol");
+        realise_drv_remotely(&toplevel_drv, host)?;
+    } else {
+        let outpath = realise_toplevel_output_path(system_attribute)?;
+        // We should change this in a way that realise_toplevel_output_path actually accepts the .drv file, but that may be impeding to nix-output-monitor
+        assert_eq!(
+            outpath, toplevel_out,
+            "Built output path does not match evaluated output path"
+        );
+        copy_to_host(&toplevel_out, host)?;
+    }
+
+    activate_profile(&toplevel_out, true, Some(host))?;
+    switch_to_configuration(&toplevel_out, "switch", true, Some(host))
 }
 
 fn main() -> Result<(), libnxbd::NixError> {
@@ -59,16 +81,11 @@ fn main() -> Result<(), libnxbd::NixError> {
             }
             for system in &system_attributes {
                 let result = nixos_deploy_info(system)?;
-                let remote_build = result.system != user_info.system
-                    && !user_info
-                        .remote_builders
-                        .iter()
-                        .any(|rb| rb.system == result.system);
                 println!(
                     "{}",
                     format!("{} Building system: {}", ARROW, system).white()
                 );
-                let toplevel = toplevel_output_path(system)?;
+                let (toplevel, _) = toplevel_derivation_paths(system)?;
                 println!(
                     "{}",
                     format!("{} Built store path for {}: {}", ARROW, system, toplevel).white()
@@ -93,7 +110,11 @@ fn main() -> Result<(), libnxbd::NixError> {
                         let result =
                             nixos_deploy_info(sa).and_then(|deploy_info| {
                                 match deploy_info.fqdn_or_host_name {
-                                    Some(host) => deploy_remote(sa, &host),
+                                    Some(host) => deploy_remote(
+                                        sa,
+                                        &host,
+                                        !user_info.can_build_natively(&deploy_info.system),
+                                    ),
                                     None => Err(libnxbd::NixError::NoHostName),
                                 }
                             });
@@ -125,7 +146,7 @@ fn main() -> Result<(), libnxbd::NixError> {
             };
             println!("Switching system: {system_attribute}");
 
-            let toplevel = toplevel_output_path(system_attribute)?;
+            let (toplevel, _) = toplevel_derivation_paths(system_attribute)?;
             println!("Store path is [{toplevel}]");
             activate_profile(&toplevel, true, None)?;
             switch_to_configuration(&toplevel, "switch", true, None)?;

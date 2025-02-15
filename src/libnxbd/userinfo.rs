@@ -39,4 +39,15 @@ impl UserInfo {
             remote_builders,
         })
     }
+
+    pub fn can_build_natively(&self, target_system: &str) -> bool {
+        // Can build natively if:
+        // 1. Target system matches user's system, or
+        // 2. User has a remote builder configured for the target system
+        target_system == self.system
+            || self
+                .remote_builders
+                .iter()
+                .any(|rb| rb.system == target_system)
+    }
 }
