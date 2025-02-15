@@ -201,7 +201,9 @@ fn get_nix_config_value(key: &str) -> Result<String, NixError> {
 pub fn get_system() -> Result<(String, Vec<String>), NixError> {
     let system = get_nix_config_value("system")?;
     let extra_platforms = get_nix_config_value("extra-platforms")
-        .map(|platforms| platforms.split_whitespace().map(String::from).collect())
+        .map(|platforms| {
+            serde_json::from_str::<Vec<String>>(&platforms).unwrap_or_else(|_| Vec::new())
+        })
         .unwrap_or_default();
 
     Ok((system, extra_platforms))
