@@ -172,7 +172,7 @@ fn main() -> Result<(), libnxbd::NixError> {
                         let results = run_all_checks(&info, &user_info);
                         let results_for_display = results.clone();
 
-                        for (group_id, group_passed, check_results) in results_for_display {
+                        for (group_id, _, check_results) in results_for_display {
                             if let Some(group) =
                                 get_standard_checks().into_iter().find(|g| g.id == group_id)
                             {
@@ -193,16 +193,20 @@ fn main() -> Result<(), libnxbd::NixError> {
                                     })
                                     .collect();
 
-                                // Show group if it has any checks (passed or unignored failures)
-                                if !passed_checks.is_empty() || !unignored_failures.is_empty() {
+                                // Only show group if there are any non-ignored checks
+                                let non_ignored_count =
+                                    passed_checks.len() + unignored_failures.len();
+                                if non_ignored_count > 0 {
                                     // Group passes if there are no unignored failures
                                     let effective_group_passed = unignored_failures.is_empty();
 
                                     println!(
-                                        "{} - {}: {}\n{}\n",
+                                        "{} - {}: {} {}\n{}\n",
                                         group.id.cyan().bold(),
                                         group.name.bold(),
-                                        passed_symbol(effective_group_passed), // Use the new passed status
+                                        passed_symbol(effective_group_passed),
+                                        format!("({}/{})", passed_checks.len(), non_ignored_count)
+                                            .dimmed(),
                                         group.description.dimmed()
                                     );
 
@@ -227,6 +231,7 @@ fn main() -> Result<(), libnxbd::NixError> {
                                         }
                                     }
                                 }
+                                println!();
                             }
                         }
                         all_results.push((system, results));
