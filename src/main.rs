@@ -161,9 +161,37 @@ fn main() -> Result<(), libnxbd::NixError> {
                     Ok(info) => {
                         let results = run_all_checks(&info, &user_info);
                         for (group_id, group_passed, check_results) in results {
-                            println!("{}: {}", group_id, passed_symbol(group_passed));
+                            // Find and display group information
+                            if let Some(group) =
+                                get_standard_checks().into_iter().find(|g| g.id == group_id)
+                            {
+                                println!(
+                                    "{} - {}: {}\n{}\n",
+                                    group.id.cyan().bold(),
+                                    group.name.bold(),
+                                    passed_symbol(group_passed),
+                                    group.description.dimmed()
+                                );
+                            }
                             for (check_id, check_passed) in check_results {
                                 println!("  {}: {}", check_id, passed_symbol(check_passed));
+                                if *verbose && !check_passed {
+                                    // Find the check details from standard checks
+                                    if let Some(check) = get_standard_checks()
+                                        .into_iter()
+                                        .find(|g| g.id == group_id)
+                                        .and_then(|g| {
+                                            g.checks.into_iter().find(|c| c.id == check_id)
+                                        })
+                                    {
+                                        println!(
+                                            "    {} - {}\n      {}\n",
+                                            check_id.yellow(),
+                                            check.description,
+                                            check.advice.dimmed()
+                                        );
+                                    }
+                                }
                             }
                         }
                     }
