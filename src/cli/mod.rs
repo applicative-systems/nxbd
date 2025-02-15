@@ -30,6 +30,8 @@ pub enum Command {
         verbose: bool,
         #[arg(long)]
         save_ignore: bool,
+        #[arg(long, default_value = ".nxbd-ignore.yaml")]
+        ignore_file: String,
     },
     Checks,
 }

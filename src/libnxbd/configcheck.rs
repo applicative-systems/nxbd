@@ -697,6 +697,7 @@ impl From<serde_yaml::Error> for CheckFileError {
 }
 
 pub fn save_failed_checks_to_ignore_file(
+    path: &str,
     system_results: &[(&FlakeReference, Vec<(String, bool, Vec<(String, bool)>)>)],
 ) -> Result<(), CheckFileError> {
     let mut ignore_map: HashMap<String, HashMap<String, Vec<String>>> = HashMap::new();
@@ -723,14 +724,14 @@ pub fn save_failed_checks_to_ignore_file(
 
     if !ignore_map.is_empty() {
         let yaml = serde_yaml::to_string(&ignore_map)?;
-        fs::write(".nxbd-ignore.yaml", yaml)?;
+        fs::write(path, yaml)?;
     }
 
     Ok(())
 }
 
-pub fn load_ignored_checks() -> Option<HashMap<String, HashMap<String, Vec<String>>>> {
-    match fs::read_to_string(".nxbd-ignore.yaml") {
+pub fn load_ignored_checks(path: &str) -> Option<HashMap<String, HashMap<String, Vec<String>>>> {
+    match fs::read_to_string(path) {
         Ok(contents) => serde_yaml::from_str(&contents).ok(),
         Err(_) => None,
     }

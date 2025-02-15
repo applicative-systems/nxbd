@@ -158,11 +158,12 @@ fn main() -> Result<(), libnxbd::NixError> {
             systems,
             verbose,
             save_ignore,
+            ignore_file,
         } => {
             let system_attributes = flakerefs_or_default(systems)?;
             println!("\nSystem Configurations:");
 
-            let ignored_checks = load_ignored_checks();
+            let ignored_checks = load_ignored_checks(&ignore_file);
             let mut all_results = Vec::new();
 
             for system in &system_attributes {
@@ -244,10 +245,10 @@ fn main() -> Result<(), libnxbd::NixError> {
             }
 
             if *save_ignore {
-                if let Err(e) = save_failed_checks_to_ignore_file(&all_results) {
+                if let Err(e) = save_failed_checks_to_ignore_file(&ignore_file, &all_results) {
                     eprintln!("Failed to save ignore file: {}", e);
                 } else {
-                    println!("Created .nxbd-ignore.yaml with failed checks");
+                    println!("Created {} with failed checks", ignore_file);
                 }
             }
         }
