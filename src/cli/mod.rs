@@ -28,6 +28,8 @@ pub enum Command {
         systems: Vec<libnxbd::FlakeReference>,
         #[arg(short, long)]
         verbose: bool,
+        #[arg(long)]
+        save_ignore: bool,
     },
     Checks,
 }

@@ -1,5 +1,9 @@
+use super::FlakeReference;
 use super::{nixosattributes::ConfigInfo, userinfo::UserInfo};
+use serde_yaml;
+use std::collections::HashMap;
 use std::fmt;
+use std::fs;
 
 #[derive(Debug)]
 pub struct CheckError {
@@ -663,4 +667,64 @@ pub fn get_standard_checks() -> Vec<CheckGroup> {
             ],
         },
     ]
+}
+
+#[derive(Debug)]
+pub enum CheckFileError {
+    Io(std::io::Error),
+    Yaml(serde_yaml::Error),
+}
+
+impl std::fmt::Display for CheckFileError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Io(e) => write!(f, "IO error: {}", e),
+            Self::Yaml(e) => write!(f, "YAML error: {}", e),
+        }
+    }
+}
+
+impl From<std::io::Error> for CheckFileError {
+    fn from(err: std::io::Error) -> Self {
+        CheckFileError::Io(err)
+    }
+}
+
+impl From<serde_yaml::Error> for CheckFileError {
+    fn from(err: serde_yaml::Error) -> Self {
+        CheckFileError::Yaml(err)
+    }
+}
+
+pub fn save_failed_checks_to_ignore_file(
+    system_results: &[(&FlakeReference, Vec<(String, bool, Vec<(String, bool)>)>)],
+) -> Result<(), CheckFileError> {
+    let mut ignore_map: HashMap<String, HashMap<String, Vec<String>>> = HashMap::new();
+
+    for (system, results) in system_results {
+        let mut system_map: HashMap<String, Vec<String>> = HashMap::new();
+
+        for (group_id, _group_passed, check_results) in results {
+            let failed_checks: Vec<String> = check_results
+                .iter()
+                .filter(|(_, passed)| !passed)
+                .map(|(check_id, _)| check_id.clone())
+                .collect();
+
+            if !failed_checks.is_empty() {
+                system_map.insert(group_id.clone(), failed_checks);
+            }
+        }
+
+        if !system_map.is_empty() {
+            ignore_map.insert(system.to_string(), system_map);
+        }
+    }
+
+    if !ignore_map.is_empty() {
+        let yaml = serde_yaml::to_string(&ignore_map)?;
+        fs::write(".nxbd-ignore.yaml", yaml)?;
+    }
+
+    Ok(())
 }

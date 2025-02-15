@@ -4,7 +4,7 @@ mod libnxbd;
 use crate::cli::{Cli, Command};
 use clap::Parser;
 use libnxbd::{
-    configcheck::{get_standard_checks, run_all_checks},
+    configcheck::{get_standard_checks, run_all_checks, save_failed_checks_to_ignore_file},
     nixcommands::{
         activate_profile, copy_to_host, nixos_configuration_flakerefs, realise_drv_remotely,
         realise_toplevel_output_path, switch_to_configuration,
@@ -151,16 +151,24 @@ fn main() -> Result<(), libnxbd::NixError> {
             activate_profile(&toplevel, true, None)?;
             switch_to_configuration(&toplevel, "switch", true, None)?;
         }
-        Command::Check { systems, verbose } => {
+        Command::Check {
+            systems,
+            verbose,
+            save_ignore,
+        } => {
             let system_attributes = flakerefs_or_default(systems)?;
             println!("\nSystem Configurations:");
+
+            let mut all_results = Vec::new();
 
             for system in &system_attributes {
                 println!("\n=== {} ===", system.to_string().cyan().bold());
                 match nixos_deploy_info(system) {
                     Ok(info) => {
                         let results = run_all_checks(&info, &user_info);
-                        for (group_id, group_passed, check_results) in results {
+                        let results_for_display = results.clone();
+
+                        for (group_id, group_passed, check_results) in results_for_display {
                             // Find and display group information
                             if let Some(group) =
                                 get_standard_checks().into_iter().find(|g| g.id == group_id)
@@ -193,11 +201,21 @@ fn main() -> Result<(), libnxbd::NixError> {
                                 }
                             }
                         }
+
+                        all_results.push((system, results));
                     }
                     Err(e) => match e {
                         NixError::Eval(msg) => println!("Error evaluating system info:\n{}", msg),
                         _ => println!("Error getting system info: {:?}", e),
                     },
+                }
+            }
+
+            if *save_ignore {
+                if let Err(e) = save_failed_checks_to_ignore_file(&all_results) {
+                    eprintln!("Failed to save ignore file: {}", e);
+                } else {
+                    println!("Created .nxbd-ignore.yaml with failed checks");
                 }
             }
         }
