@@ -45,6 +45,7 @@ pub struct ConfigInfo {
     pub log_refused_connections: bool,
     pub nix_optimise_automatic: bool,
     pub nix_auto_optimise_store: bool,
+    pub boot_is_container: bool,
 }
 
 #[derive(Deserialize, Debug)]
@@ -116,6 +117,7 @@ pub fn nixos_deploy_info(flake_reference: &FlakeReference) -> Result<ConfigInfo,
             logRefusedConnections = config.networking.firewall.logRefusedConnections;
             nixOptimiseAutomatic = config.nix.optimise.automatic;
             nixAutoOptimiseStore = config.nix.settings.auto-optimise-store;
+            bootIsContainer = config.boot.isContainer;
         }"#;
 
     let output = std::process::Command::new("nix")

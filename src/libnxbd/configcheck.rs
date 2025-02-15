@@ -346,7 +346,10 @@ pub fn get_standard_checks() -> Vec<CheckGroup> {
                     "Nix store optimisation should be enabled",
                     "Set either nix.settings.auto-optimise-store or nix.optimise.automatic",
                     |config, _user_info| {
-                        if !config.nix_optimise_automatic && !config.nix_auto_optimise_store {
+                        if config.boot_is_container {
+                            // Skip check for containers as they don't have their own nix store
+                            Ok(())
+                        } else if !config.nix_optimise_automatic && !config.nix_auto_optimise_store {
                             Err(CheckError {
                                 check_name: "Nix store optimisation".to_string(),
                                 message: "Nix store optimisation is disabled. Set either nix.settings.auto-optimise-store or nix.optimise.automatic".to_string(),
