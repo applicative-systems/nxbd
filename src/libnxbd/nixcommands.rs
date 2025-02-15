@@ -174,6 +174,7 @@ pub fn copy_to_host(path: &str, host: &str) -> Result<(), NixError> {
 }
 
 #[derive(Debug)]
+#[allow(dead_code)]
 pub struct RemoteBuilder {
     pub ssh_host: String,
     pub system: String,
