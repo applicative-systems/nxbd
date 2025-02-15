@@ -10,7 +10,8 @@ use std::str;
 pub struct ConfigInfo {
     pub toplevel_out: String,
     pub toplevel_drv: String,
-    pub fqdn_or_host_name: Option<String>,
+    pub host_name: String,
+    pub fqdn_or_host_name: String,
     pub fqdn: Option<String>,
     pub wheel_needs_password: bool,
     pub sudo_wheel_only: bool,
@@ -76,6 +77,7 @@ pub fn nixos_deploy_info(flake_reference: &FlakeReference) -> Result<ConfigInfo,
             inherit (pkgs) system;
             toplevelOut = config.system.build.toplevel;
             toplevelDrv = config.system.build.toplevel.drvPath;
+            hostName = config.networking.hostName;
             fqdnOrHostName = config.networking.fqdnOrHostName;
             fqdn = config.networking.fqdn;
             wheelNeedsPassword = config.security.sudo.wheelNeedsPassword;

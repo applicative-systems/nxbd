@@ -15,7 +15,6 @@ pub enum NixError {
     ConfigSwitch,
     ProfileSet,
     Deserialization,
-    NoHostName,
     Copy,
 }
 
@@ -27,7 +26,6 @@ impl fmt::Display for NixError {
             Self::ConfigSwitch => write!(f, "Failed to switch configuration"),
             Self::ProfileSet => write!(f, "Failed to set profile"),
             Self::Deserialization => write!(f, "Failed to parse output"),
-            Self::NoHostName => write!(f, "No hostname configured"),
             Self::Copy => write!(f, "Failed to copy to host"),
         }
     }

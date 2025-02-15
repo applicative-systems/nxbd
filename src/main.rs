@@ -107,19 +107,15 @@ fn main() -> Result<(), libnxbd::NixError> {
                 system_attributes
                     .iter()
                     .map(|sa| {
-                        let result =
-                            nixos_deploy_info(sa).and_then(|deploy_info| {
-                                match deploy_info.fqdn_or_host_name {
-                                    Some(host) => deploy_remote(
-                                        sa,
-                                        &deploy_info.toplevel_out,
-                                        &deploy_info.toplevel_drv,
-                                        &host,
-                                        !user_info.can_build_natively(&deploy_info.system),
-                                    ),
-                                    _ => Err(libnxbd::NixError::NoHostName),
-                                }
-                            });
+                        let result = nixos_deploy_info(sa).and_then(|deploy_info| {
+                            deploy_remote(
+                                sa,
+                                &deploy_info.toplevel_out,
+                                &deploy_info.toplevel_drv,
+                                &deploy_info.fqdn_or_host_name,
+                                !user_info.can_build_natively(&deploy_info.system),
+                            )
+                        });
                         (sa.clone(), result)
                     })
                     .collect();
@@ -154,13 +150,13 @@ fn main() -> Result<(), libnxbd::NixError> {
 
             // Check hostname match unless ignored
             if !ignore_hostname {
-                if let Some(config_hostname) = &deploy_info.fqdn_or_host_name {
-                    if config_hostname != &local_hostname {
-                        return Err(NixError::Eval(format!(
-                            "Hostname mismatch: system config has '{}' but local system is '{}'. Use --ignore-hostname to ignore this check.",
-                            config_hostname, local_hostname
-                        )));
-                    }
+                let config_hostname = &deploy_info.host_name;
+
+                if config_hostname != &local_hostname {
+                    return Err(NixError::Eval(format!(
+                        "Hostname mismatch: system config has '{}' but local system is '{}'. Use --ignore-hostname to ignore this check.",
+                        config_hostname, local_hostname
+                    )));
                 }
             }
 
