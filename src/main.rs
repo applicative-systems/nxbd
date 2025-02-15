@@ -195,11 +195,14 @@ fn main() -> Result<(), libnxbd::NixError> {
 
                                 // Show group if it has any checks (passed or unignored failures)
                                 if !passed_checks.is_empty() || !unignored_failures.is_empty() {
+                                    // Group passes if there are no unignored failures
+                                    let effective_group_passed = unignored_failures.is_empty();
+
                                     println!(
                                         "{} - {}: {}\n{}\n",
                                         group.id.cyan().bold(),
                                         group.name.bold(),
-                                        passed_symbol(group_passed),
+                                        passed_symbol(effective_group_passed), // Use the new passed status
                                         group.description.dimmed()
                                     );
 
