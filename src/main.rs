@@ -4,7 +4,10 @@ mod libnxbd;
 use crate::cli::{Cli, Command};
 use clap::Parser;
 use libnxbd::{
-    configcheck::{get_standard_checks, run_all_checks, save_failed_checks_to_ignore_file},
+    configcheck::{
+        get_standard_checks, is_check_ignored, load_ignored_checks, run_all_checks,
+        save_failed_checks_to_ignore_file,
+    },
     nixcommands::{
         activate_profile, copy_to_host, nixos_configuration_flakerefs, realise_drv_remotely,
         realise_toplevel_output_path, switch_to_configuration,
@@ -159,6 +162,7 @@ fn main() -> Result<(), libnxbd::NixError> {
             let system_attributes = flakerefs_or_default(systems)?;
             println!("\nSystem Configurations:");
 
+            let ignored_checks = load_ignored_checks();
             let mut all_results = Vec::new();
 
             for system in &system_attributes {
@@ -169,39 +173,51 @@ fn main() -> Result<(), libnxbd::NixError> {
                         let results_for_display = results.clone();
 
                         for (group_id, group_passed, check_results) in results_for_display {
-                            // Find and display group information
-                            if let Some(group) =
-                                get_standard_checks().into_iter().find(|g| g.id == group_id)
-                            {
-                                println!(
-                                    "{} - {}: {}\n{}\n",
-                                    group.id.cyan().bold(),
-                                    group.name.bold(),
-                                    passed_symbol(group_passed),
-                                    group.description.dimmed()
-                                );
-                            }
-                            for (check_id, check_passed) in check_results {
-                                println!("  {}: {}", check_id, passed_symbol(check_passed));
-                                if *verbose && !check_passed {
-                                    // Find the check details from standard checks
-                                    if let Some(check) = get_standard_checks()
-                                        .into_iter()
-                                        .find(|g| g.id == group_id)
-                                        .and_then(|g| {
-                                            g.checks.into_iter().find(|c| c.id == check_id)
-                                        })
-                                    {
-                                        println!(
-                                            "    - {}\n      {}\n",
-                                            check.description,
-                                            check.advice.dimmed()
-                                        );
+                            if let Some(group) = get_standard_checks().into_iter().find(|g| g.id == group_id) {
+                                let display_results: Vec<_> = check_results
+                                    .into_iter()
+                                    .filter(|(check_id, passed)| {
+                                        *passed || !ignored_checks
+                                            .as_ref()
+                                            .map(|ic| is_check_ignored(ic, system, &group_id, check_id))
+                                            .unwrap_or(false)
+                                    })
+                                    .collect();
+
+                                let has_unignored_failures = display_results
+                                    .iter()
+                                    .any(|(_, passed)| !passed);
+
+                                if has_unignored_failures {
+                                    println!(
+                                        "{} - {}: {}\n{}\n",
+                                        group.id.cyan().bold(),
+                                        group.name.bold(),
+                                        passed_symbol(group_passed),
+                                        group.description.dimmed()
+                                    );
+
+                                    for (check_id, check_passed) in display_results {
+                                        println!("  {}: {}", check_id, passed_symbol(check_passed));
+                                        if *verbose && !check_passed {
+                                            if let Some(check) = get_standard_checks()
+                                                .into_iter()
+                                                .find(|g| g.id == group_id)
+                                                .and_then(|g| {
+                                                    g.checks.into_iter().find(|c| c.id == check_id)
+                                                })
+                                            {
+                                                println!(
+                                                    "    - {}\n      {}\n",
+                                                    check.description,
+                                                    check.advice.dimmed()
+                                                );
+                                            }
+                                        }
                                     }
                                 }
                             }
                         }
-
                         all_results.push((system, results));
                     }
                     Err(e) => match e {

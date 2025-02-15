@@ -728,3 +728,23 @@ pub fn save_failed_checks_to_ignore_file(
 
     Ok(())
 }
+
+pub fn load_ignored_checks() -> Option<HashMap<String, HashMap<String, Vec<String>>>> {
+    match fs::read_to_string(".nxbd-ignore.yaml") {
+        Ok(contents) => serde_yaml::from_str(&contents).ok(),
+        Err(_) => None,
+    }
+}
+
+pub fn is_check_ignored(
+    ignored: &HashMap<String, HashMap<String, Vec<String>>>,
+    system: &FlakeReference,
+    group_id: &str,
+    check_id: &str,
+) -> bool {
+    ignored
+        .get(&system.to_string())
+        .and_then(|system_map| system_map.get(group_id))
+        .map(|checks| checks.contains(&check_id.to_string()))
+        .unwrap_or(false)
+}
