@@ -45,6 +45,99 @@ nxbd check .#{server1,server2,server3}
 nxbd check -v .#server1
 ```
 
+Example output:
+
+```console
+$ nxbd check --verbose .#dash
+
+System Configurations:
+
+=== .#dash ===
+remote_deployment - Remote Deployment Support: ✓
+Checks if the system has the required configuration to safely perform remote deployments
+
+  ssh_enabled: ✓
+  sudo_enabled: ✓
+  wheel_passwordless: ✓
+  nix_trusts_wheel: ✓
+  user_access: ✓
+  user_in_wheel: ✓
+sudo_security - Sudo Security Settings: ✗
+Checks if sudo is configured securely
+
+  wheel_only: ✗
+    - Only wheel group members should be allowed to use sudo
+      Set security.sudo.execWheelOnly = true
+
+firewall_settings - Firewall settings: ✓
+Check whether firewall is configured correctly
+
+  log_refused_connections: ✓
+boot_configuration_limit - Boot Configuration Limit: ✓
+Checks if system configuration generations are reasonably limited to prevent disk space waste
+
+  boot_systemd_generations: ✓
+  boot_grub_generations: ✓
+disk_space_management - Disk Space Management: ✓
+Checks whether the optimisations and limits for disk space are configured
+
+  journald_limits: ✓
+  nix_optimise_automatic: ✓
+nix_flakes - Nix Flakes: ✗
+Checks if flakes are enabled
+
+  nix_extra_options: ✗
+    - Nix features should include nix-command and flakes
+      Add 'experimental-features = nix-command flakes' to nix.extraOptions
+
+disable_documentation - Disable Documentation on Servers: ✗
+Checks if documentation is disabled on servers to reduce closure size
+
+  doc_nixos_enabled: ✗
+    - NixOS documentation should be disabled
+      Set documentation.nixos.enable = false
+
+  doc_enable: ✗
+    - General documentation should be disabled
+      Set documentation.enable = false
+
+  doc_dev_enable: ✓
+  doc_doc_enable: ✗
+    - Doc documentation should be disabled
+      Set documentation.doc.enable = false
+
+  doc_info_enable: ✗
+    - Info documentation should be disabled
+      Set documentation.info.enable = false
+
+  doc_man_enable: ✗
+    - Man pages should be disabled
+      Set documentation.man.enable = false
+
+enable_cpu_microcode_updates - Enable CPU Microcode Updates on x86: ✓
+Checks if CPU microcode updates are enabled on x86 systems
+
+  cpu_microcode: ✓
+nginx_recommended_settings - Nginx Recommended Settings: ✗
+Checks if nginx has recommended settings enabled
+
+  nginx_brotli: ✗
+    - Brotli compression should be enabled
+      Set services.nginx.recommendedBrotliSettings = true
+
+  nginx_gzip: ✓
+  nginx_optimisation: ✓
+  nginx_proxy: ✓
+  nginx_tls: ✗
+    - TLS settings should be enabled
+      Set services.nginx.recommendedTlsSettings = true
+
+garbage_collection - Garbage Collection: ✓
+Checks whether the Nix garbage collection is configured correctly
+
+  nix_gc: ✓
+```
+
 ### Deploy to Remote Systems
 
 The `switch-remote` command builds and deploys to remote systems.
@@ -89,11 +182,11 @@ Add to your flake.nix:
 ```nix
 {
   inputs.nxbd.url = "github:yourusername/nxbd";
-  
+
   outputs = { self, nixpkgs, nxbd }: {
     # For your packages
     packages.x86_64-linux.nxbd = nxbd.packages.x86_64-linux.default;
-    
+
     # Or in your NixOS configuration
     nixosConfigurations.hostname = nixpkgs.lib.nixosSystem {
       modules = [
