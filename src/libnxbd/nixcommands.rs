@@ -218,10 +218,35 @@ pub fn get_system() -> Result<(String, Vec<String>), NixError> {
     Ok((system, extra_platforms))
 }
 
+fn parse_builders(content: &str) -> Vec<RemoteBuilder> {
+    // in the machines file the lines are separated by \n,
+    // while they are separated by ; in the nix config when
+    // they are inline
+    content
+        .split(|c| c == ';' || c == '\n')
+        .filter_map(|line| {
+            let line = line.trim();
+            if line.is_empty() {
+                return None;
+            }
+
+            let parts: Vec<&str> = line.split_whitespace().collect();
+            if parts.len() >= 2 {
+                Some(RemoteBuilder {
+                    ssh_host: parts[0].to_string(),
+                    system: parts[1].to_string(),
+                })
+            } else {
+                None
+            }
+        })
+        .collect()
+}
+
 pub fn get_remote_builders() -> Result<Vec<RemoteBuilder>, NixError> {
     let builders_value = get_nix_config_value("builders")?
         .as_str()
-        .ok_or_else(|| NixError::Eval("system is not a string".to_string()))?
+        .ok_or_else(|| NixError::Eval("builders value is not a string".to_string()))?
         .to_string();
 
     let builders_str = if builders_value.starts_with('@') {
@@ -235,26 +260,7 @@ pub fn get_remote_builders() -> Result<Vec<RemoteBuilder>, NixError> {
         builders_value
     };
 
-    let builders = builders_str
-        .split(|c| c == ';' || c == '\n')
-        .filter_map(|line| {
-            let line = line.trim();
-            if line.is_empty() {
-                return None;
-            }
-
-            let parts: Vec<&str> = line.split_whitespace().collect();
-            match parts.as_slice() {
-                [ssh_host, system] => Some(RemoteBuilder {
-                    ssh_host: ssh_host.to_string(),
-                    system: system.to_string(),
-                }),
-                _ => None,
-            }
-        })
-        .collect();
-
-    Ok(builders)
+    Ok(parse_builders(&builders_str))
 }
 
 pub fn realise_drv_remotely(drv_path: &str, host: &str) -> Result<String, NixError> {
@@ -278,4 +284,40 @@ pub fn realise_drv_remotely(drv_path: &str, host: &str) -> Result<String, NixErr
     }
 
     Ok(path)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_builders_extended_format() {
+        let input = "ssh-ng://builder@linux-builder aarch64-linux /etc/nix/builder_ed25519 4 1 kvm,benchmark,big-parallel - c3NoLWVkMjU1MTkgQUFBQUMzTnphQzFsWkRJMU5URTVBQUFBSUpCV2N4Yi9CbGFxdDFhdU90RStGOFFVV3JVb3RpQzVxQkorVXVFV2RWQ2Igcm9vdEBuaXhvcwo=";
+        let builders = parse_builders(input);
+        assert_eq!(builders.len(), 1);
+        assert_eq!(builders[0].ssh_host, "ssh-ng://builder@linux-builder");
+        assert_eq!(builders[0].system, "aarch64-linux");
+    }
+
+    #[test]
+    fn test_parse_builders_semicolon_separated() {
+        let input = "ssh://mac x86_64-darwin ; ssh://beastie x86_64-freebsd";
+        let builders = parse_builders(input);
+        assert_eq!(builders.len(), 2);
+        assert_eq!(builders[0].ssh_host, "ssh://mac");
+        assert_eq!(builders[0].system, "x86_64-darwin");
+        assert_eq!(builders[1].ssh_host, "ssh://beastie");
+        assert_eq!(builders[1].system, "x86_64-freebsd");
+    }
+
+    #[test]
+    fn test_parse_builders_newline_separated() {
+        let input = "ssh://mac x86_64-darwin\nssh://beastie x86_64-freebsd";
+        let builders = parse_builders(input);
+        assert_eq!(builders.len(), 2);
+        assert_eq!(builders[0].ssh_host, "ssh://mac");
+        assert_eq!(builders[0].system, "x86_64-darwin");
+        assert_eq!(builders[1].ssh_host, "ssh://beastie");
+        assert_eq!(builders[1].system, "x86_64-freebsd");
+    }
 }
