@@ -63,8 +63,35 @@ fn deploy_remote(
 
 fn main() -> Result<(), libnxbd::NixError> {
     let cli = Cli::parse();
-
     let user_info = UserInfo::collect()?;
+
+    if cli.verbose {
+        println!("\nLocal Deployment Configuration:");
+        println!("  User: {}", user_info.username.cyan());
+
+        if !user_info.ssh_keys.is_empty() {
+            println!("\n  SSH Keys:");
+            for key in &user_info.ssh_keys {
+                println!("    - {}", key.dimmed());
+            }
+        }
+
+        let mut build_platforms = vec![user_info.system.clone()];
+        build_platforms.extend(user_info.extra_platforms.clone());
+
+        println!("\n  Build Capabilities:");
+        println!("    Local: {}", build_platforms.join(", ").cyan());
+
+        if !user_info.remote_builders.is_empty() {
+            let remote_systems: Vec<_> = user_info
+                .remote_builders
+                .iter()
+                .map(|rb| format!("{} via {}", rb.system, rb.ssh_host))
+                .collect();
+            println!("    Remote: {}", remote_systems.join(", ").cyan());
+        }
+        println!();
+    }
 
     match &cli.command {
         Command::Build { systems } => {
