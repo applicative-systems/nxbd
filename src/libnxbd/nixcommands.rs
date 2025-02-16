@@ -8,7 +8,7 @@ use which::which;
 
 use super::FlakeReference;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum NixError {
     Eval(String),
     Build,
@@ -63,40 +63,78 @@ pub fn nixos_configuration_flakerefs(flake_url: &str) -> Result<Vec<FlakeReferen
     Ok(flakerefs)
 }
 
-pub fn realise_toplevel_output_path(flake_reference: &FlakeReference) -> Result<String, NixError> {
-    let (cmd, mut args) = match which("nom") {
-        Ok(_) => ("nom", vec!["build"]),
-        Err(_) => ("nix", vec!["build", "--no-link"]),
-    };
+// New helper module for command execution
+mod command {
+    use super::NixError;
+    use std::process::{Command, Output};
 
-    let target = format!(
-        "{0}#nixosConfigurations.\"{1}\".config.system.build.toplevel",
-        flake_reference.url, flake_reference.attribute
-    );
-
-    args.extend(["--json", &target]);
-
-    let build_output = process::Command::new(cmd)
-        .args(args)
-        .stderr(process::Stdio::inherit())
-        .output()
-        .map_err(|_| NixError::Build)?;
-
-    if !build_output.status.success() {
-        return Err(NixError::Build);
+    pub fn build_remote_command(remote_host: Option<&str>, use_sudo: bool) -> Vec<String> {
+        let mut command_vec = Vec::new();
+        if let Some(host) = remote_host {
+            command_vec.extend(["ssh", host].map(String::from));
+        }
+        if use_sudo {
+            command_vec.push("sudo".to_string());
+        }
+        command_vec
     }
 
-    let stdout_str = String::from_utf8_lossy(&build_output.stdout);
-    let parsed: Vec<serde_json::Value> =
-        serde_json::from_str(&stdout_str).map_err(|_| NixError::Deserialization)?;
-    let first_result = parsed.first().ok_or(NixError::Deserialization)?;
-    let out_path = first_result
-        .get("outputs")
-        .and_then(|o| o.get("out"))
-        .and_then(|o| o.as_str())
-        .ok_or(NixError::Deserialization)?;
-    let parsed = vec![out_path.to_string()];
-    Ok(parsed.into_iter().next().expect("Empty build output"))
+    pub fn run_command(cmd: &str, args: &[&str], error: NixError) -> Result<Output, NixError> {
+        Command::new(cmd)
+            .args(args)
+            .stderr(std::process::Stdio::inherit())
+            .output()
+            .map_err(|_| error)
+    }
+
+    pub fn run_remote_command(
+        cmd: &[&str],
+        remote_host: Option<&str>,
+        use_sudo: bool,
+        error: NixError,
+    ) -> Result<Output, NixError> {
+        let mut command = build_remote_command(remote_host, use_sudo);
+        command.extend(cmd.iter().map(|s| s.to_string()));
+
+        let (cmd, args) = command.split_first().ok_or_else(|| error.clone())?;
+
+        run_command(
+            cmd,
+            args.iter()
+                .map(String::as_str)
+                .collect::<Vec<_>>()
+                .as_slice(),
+            error,
+        )
+    }
+}
+
+// New helper module for JSON parsing
+mod json {
+    use super::NixError;
+    use serde_json::Value;
+    use std::str;
+
+    pub fn parse_nix_json_output(output: &[u8]) -> Result<Value, NixError> {
+        let stdout_str = str::from_utf8(output)
+            .map_err(|_| NixError::Eval("Invalid UTF-8 in nix output".to_string()))?;
+
+        serde_json::from_str(stdout_str)
+            .map_err(|_| NixError::Eval("Failed to parse JSON output".to_string()))
+    }
+
+    pub fn get_json_string(value: &Value, path: &[&str]) -> Result<String, NixError> {
+        let mut current = value;
+        for &key in path {
+            current = current
+                .get(key)
+                .ok_or_else(|| NixError::Eval(format!("Missing key: {}", key)))?;
+        }
+        current
+            .as_str()
+            .map(String::from)
+            .ok_or_else(|| NixError::Eval("Value is not a string".to_string()))
+    }
 }
 
 pub fn activate_profile(
@@ -104,32 +142,19 @@ pub fn activate_profile(
     use_sudo: bool,
     remote_host: Option<&str>,
 ) -> Result<(), NixError> {
-    let mut command_vec = Vec::new();
-
-    if let Some(host) = remote_host {
-        command_vec.push("ssh");
-        command_vec.push(host);
-    }
-    if use_sudo {
-        command_vec.push("sudo");
-    }
-
-    command_vec.extend(vec![
-        "nix-env",
-        "-p",
-        "/nix/var/nix/profiles/system",
-        "--set",
-        toplevel_path,
-    ]);
-
-    let (cmd, args) = command_vec.split_first().ok_or(NixError::ProfileSet)?;
-
-    process::Command::new(cmd)
-        .args(args)
-        .stderr(process::Stdio::inherit())
-        .output()
-        .map_err(|_| NixError::ProfileSet)
-        .map(|_| ())
+    command::run_remote_command(
+        &[
+            "nix-env",
+            "-p",
+            "/nix/var/nix/profiles/system",
+            "--set",
+            toplevel_path,
+        ],
+        remote_host,
+        use_sudo,
+        NixError::ProfileSet,
+    )?;
+    Ok(())
 }
 
 pub fn switch_to_configuration(
@@ -138,27 +163,14 @@ pub fn switch_to_configuration(
     use_sudo: bool,
     remote_host: Option<&str>,
 ) -> Result<(), NixError> {
-    let mut command_vec = Vec::new();
-
-    if let Some(host) = remote_host {
-        command_vec.push("ssh");
-        command_vec.push(host);
-    }
-    if use_sudo {
-        command_vec.push("sudo");
-    }
-
     let switch_path = format!("{toplevel_path}/bin/switch-to-configuration");
-    command_vec.extend(vec![&switch_path, command]);
-
-    let (cmd, args) = command_vec.split_first().ok_or(NixError::ConfigSwitch)?;
-
-    process::Command::new(cmd)
-        .args(args)
-        .stderr(process::Stdio::inherit())
-        .output()
-        .map_err(|_| NixError::ConfigSwitch)
-        .map(|_| ())
+    command::run_remote_command(
+        &[&switch_path, command],
+        remote_host,
+        use_sudo,
+        NixError::ConfigSwitch,
+    )?;
+    Ok(())
 }
 
 pub fn copy_to_host(path: &str, host: &str) -> Result<(), NixError> {
@@ -178,18 +190,14 @@ pub struct RemoteBuilder {
     pub system: String,
 }
 
-fn get_nix_config_value(key: &str) -> Result<Value, NixError> {
-    let output = process::Command::new("nix")
-        .args(["config", "show", "--json"])
-        .output()
-        .map_err(|_| NixError::Eval("Failed to execute nix show-config".to_string()))?;
+pub fn get_nix_config_value(key: &str) -> Result<Value, NixError> {
+    let output = command::run_command(
+        "nix",
+        &["config", "show", "--json"],
+        NixError::Eval("Failed to execute nix config show".to_string()),
+    )?;
 
-    let config: Value = serde_json::from_str(
-        str::from_utf8(&output.stdout)
-            .map_err(|_| NixError::Eval("Invalid UTF-8 in nix show-config output".to_string()))?,
-    )
-    .map_err(|_| NixError::Eval("Failed to parse JSON output".to_string()))?;
-
+    let config = json::parse_nix_json_output(&output.stdout)?;
     config
         .get(key)
         .and_then(|s| s.get("value"))
@@ -284,6 +292,26 @@ pub fn realise_drv_remotely(drv_path: &str, host: &str) -> Result<String, NixErr
     }
 
     Ok(path)
+}
+
+pub fn realise_toplevel_output_path(flake_reference: &FlakeReference) -> Result<String, NixError> {
+    let (cmd, args) = match which("nom") {
+        Ok(_) => ("nom", vec!["build"]),
+        Err(_) => ("nix", vec!["build", "--no-link"]),
+    };
+
+    let target = format!(
+        "{0}#nixosConfigurations.\"{1}\".config.system.build.toplevel",
+        flake_reference.url, flake_reference.attribute
+    );
+
+    let mut args = args;
+    args.extend(["--json", &target]);
+
+    let output = command::run_command(cmd, &args, NixError::Build)?;
+    let value = json::parse_nix_json_output(&output.stdout)?;
+
+    json::get_json_string(&value, &["outputs", "out"])
 }
 
 #[cfg(test)]
