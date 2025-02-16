@@ -5,6 +5,9 @@ use crate::libnxbd;
 #[derive(Parser, Debug)]
 #[command(name = "nxbd", about = "CLI tool to build and switch systems")]
 pub struct Cli {
+    #[arg(short, long, global = true)]
+    pub verbose: bool,
+
     #[command(subcommand)]
     pub command: Command,
 }
@@ -28,8 +31,6 @@ pub enum Command {
     Check {
         #[arg(value_parser = libnxbd::flakeref::parse_flake_reference)]
         systems: Vec<libnxbd::FlakeReference>,
-        #[arg(short, long)]
-        verbose: bool,
         #[arg(long)]
         save_ignore: bool,
         #[arg(long, default_value = ".nxbd-ignore.yaml")]

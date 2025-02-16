@@ -173,7 +173,6 @@ fn main() -> Result<(), libnxbd::NixError> {
         }
         Command::Check {
             systems,
-            verbose,
             save_ignore,
             ignore_file,
         } => {
@@ -236,7 +235,7 @@ fn main() -> Result<(), libnxbd::NixError> {
                                     // Show unignored failed checks
                                     for (check_id, check_passed) in unignored_failures {
                                         println!("  {}: {}", check_id, passed_symbol(check_passed));
-                                        if *verbose {
+                                        if cli.verbose {
                                             if let Some(check) =
                                                 group.checks.iter().find(|c| c.id == check_id)
                                             {
