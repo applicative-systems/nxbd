@@ -68,6 +68,8 @@
 
           checks = config.packages // {
             formatting = treefmtEval.config.build.check inputs.self;
+
+            switch-local = pkgs.testers.runNixOSTest ./tests/switch-test.nix;
           };
         };
       flake = {
