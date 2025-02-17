@@ -74,13 +74,18 @@ pub fn nixos_deploy_info(flake_reference: &FlakeReference) -> Result<ConfigInfo,
     // config that the checks would ever need. Maybe at some point in the future
     // this should be modularized.
     let nix_expr = r#"{ config, pkgs, ... }:
+        let
+          tryOrNull = x:
+            let r = builtins.tryEval x;
+            in if r.success then r.value else null;
+        in
         {
             inherit (pkgs) system;
             toplevelOut = config.system.build.toplevel;
             toplevelDrv = config.system.build.toplevel.drvPath;
             hostName = config.networking.hostName;
             fqdnOrHostName = config.networking.fqdnOrHostName;
-            fqdn = config.networking.fqdn;
+            fqdn = tryOrNull config.networking.fqdn;
             wheelNeedsPassword = config.security.sudo.wheelNeedsPassword;
             sudoWheelOnly = config.security.sudo.execWheelOnly;
             sshEnabled = config.services.openssh.enable;
