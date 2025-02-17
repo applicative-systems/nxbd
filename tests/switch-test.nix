@@ -8,6 +8,9 @@ in
   name = "nxbd-switch-test";
 
   node.pkgsReadOnly = false;
+  imports = [
+    ./debug-vm.nix
+  ];
   nodes = {
     machine =
       {
@@ -49,6 +52,13 @@ in
           pkgs.path
         ];
 
+        nixpkgs.overlays = [
+          (import ../overlay.nix)
+        ];
+
+        environment.systemPackages = [
+          pkgs.nxbd
+        ];
       };
   };
 
@@ -62,9 +72,12 @@ in
     machine.succeed("cp ${./project-folder}/* .")
 
     machine.succeed("nix flake lock --override-input nixpkgs ${pkgs.path}")
-    machine.succeed("cat flake.lock")
-    machine.succeed("nix -L build .#nixosConfigurations.test.config.system.build.toplevel")
-    machine.succeed("ls -lsa result/")
+    print(machine.succeed("cat flake.lock"))
+    machine.succeed("nix -L build .#nixosConfigurations.machine.config.system.build.toplevel")
+
+    machine.succeed("nxbd check")
+    machine.succeed("nxbd build")
+    machine.succeed("nxbd switch-local")
 
   '';
 }

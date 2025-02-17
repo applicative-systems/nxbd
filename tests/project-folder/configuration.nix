@@ -1,9 +1,8 @@
 { modulesPath, ... }:
 {
   imports = [
-    (modulesPath + "/profiles/installation-device.nix")
-    (modulesPath + "/profiles/base.nix")
     (modulesPath + "/testing/test-instrumentation.nix")
+    ./hardware-configuration.nix
   ];
 
   boot.loader.grub = {
@@ -12,11 +11,5 @@
   };
 
   documentation.enable = false;
-
-  fileSystems."/" = {
-    device = "/dev/vda1";
-    fsType = "ext4";
-  };
-
-  nixpkgs.hostPlatform = "x86_64-linux";
+  networking.hostName = "machine";
 }
