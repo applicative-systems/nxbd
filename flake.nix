@@ -22,6 +22,7 @@
       perSystem =
         {
           config,
+          lib,
           pkgs,
           system,
           ...
@@ -66,11 +67,16 @@
 
           formatter = treefmtEval.config.build.wrapper;
 
-          checks = config.packages // {
-            formatting = treefmtEval.config.build.check inputs.self;
-
-            switch-local = pkgs.testers.runNixOSTest ./tests/switch-test.nix;
-          };
+          checks =
+            config.packages
+            // lib.optionalAttrs (pkgs.stdenv.isx86_64 && pkgs.stdenv.isLinux) {
+              # Should run on all CPUs, but first we need to make the system
+              # attribute inside the config a bit more dynamic.
+              switch-local = pkgs.testers.runNixOSTest ./tests/switch-test.nix;
+            }
+            // {
+              formatting = treefmtEval.config.build.check inputs.self;
+            };
         };
       flake = {
         overlays.default = import ./overlay.nix;
