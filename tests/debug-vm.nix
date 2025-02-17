@@ -1,19 +1,17 @@
 {
-  interactive.nodes.machine = {
-    services.openssh = {
-      enable = true;
-      settings = {
-        PermitRootLogin = "yes";
-        PermitEmptyPasswords = "yes";
-      };
+  services.openssh = {
+    enable = true;
+    settings = {
+      PermitRootLogin = "yes";
+      PermitEmptyPasswords = "yes";
     };
-    security.pam.services.sshd.allowNullPassword = true;
-    virtualisation.forwardPorts = [
-      {
-        from = "host";
-        host.port = 2222;
-        guest.port = 22;
-      }
-    ];
   };
+  security.pam.services.sshd.allowNullPassword = true;
+  virtualisation.forwardPorts = [
+    {
+      from = "host";
+      host.port = 2222;
+      guest.port = 22;
+    }
+  ];
 }
