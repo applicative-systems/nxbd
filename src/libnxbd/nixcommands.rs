@@ -135,6 +135,23 @@ mod json {
             .map(String::from)
             .ok_or_else(|| NixError::Eval("Value is not a string".to_string()))
     }
+
+    pub fn extract_single_object_from_array(value: &Value) -> Result<&Value, NixError> {
+        if let Value::Array(arr) = value {
+            match arr.len() {
+                0 => Err(NixError::Eval(
+                    "Expected array with one item, got empty array".to_string(),
+                )),
+                1 => Ok(&arr[0]),
+                _ => Err(NixError::Eval(
+                    "Expected array with one item, got multiple items".to_string(),
+                )),
+            }
+        } else {
+            // Not an array, return as-is
+            Ok(value)
+        }
+    }
 }
 
 pub fn activate_profile(
@@ -311,7 +328,9 @@ pub fn realise_toplevel_output_path(flake_reference: &FlakeReference) -> Result<
     let output = command::run_command(cmd, &args, NixError::Build)?;
     let value = json::parse_nix_json_output(&output.stdout)?;
 
-    json::get_json_string(&value, &["outputs", "out"])
+    // sometimes the output is a list with just one item.
+    let single_value = json::extract_single_object_from_array(&value)?;
+    json::get_json_string(&single_value, &["outputs", "out"])
 }
 
 #[cfg(test)]
