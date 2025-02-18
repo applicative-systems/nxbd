@@ -99,4 +99,18 @@ pub enum Command {
 
     #[command(about = "List all available configuration checks")]
     Checks,
+
+    #[command(about = "Show status of NixOS systems")]
+    #[command(
+        long_about = "Display detailed status information about one or more NixOS systems, \
+        including deployment status, reboot requirements, and system health."
+    )]
+    Status {
+        #[arg(
+            help = "Systems to check (e.g., '.#hostname' or 'github:user/repo#hostname'). \
+            Will check all systems if not specified."
+        )]
+        #[arg(value_parser = libnxbd::flakeref::parse_flake_reference)]
+        systems: Vec<libnxbd::FlakeReference>,
+    },
 }

@@ -335,34 +335,6 @@ pub fn realise_toplevel_output_path(flake_reference: &FlakeReference) -> Result<
     json::get_json_string(&single_value, &["outputs", "out"])
 }
 
-pub fn check_needs_reboot(host: Option<&str>) -> Result<bool, NixError> {
-    let check_command = r#"
-        booted="/run/booted-system"
-        current="/nix/var/nix/profiles/system"
-        needs_reboot=0
-
-        for component in initrd kernel kernel-modules; do
-            if ! cmp -s "$booted/$component" "$current/$component"; then
-                needs_reboot=1
-                break
-            fi
-        done
-
-        exit $needs_reboot
-    "#;
-
-    let mut cmd = command::build_remote_command(host, false);
-    cmd.extend(["bash", "-c", check_command].iter().map(|&s| s.to_string()));
-
-    let output = command::run_command(
-        &cmd[0],
-        &cmd[1..].iter().map(String::as_str).collect::<Vec<_>>(),
-        NixError::Eval("Failed to check reboot status".to_string()),
-    )?;
-
-    Ok(!output.status.success())
-}
-
 pub fn reboot_host(host: &str) -> Result<(), NixError> {
     // Use systemctl to reboot, which will gracefully terminate the SSH connection
     let mut cmd = command::build_remote_command(Some(host), true);
@@ -382,6 +354,109 @@ pub fn reboot_host(host: &str) -> Result<(), NixError> {
     }
 
     Ok(())
+}
+
+#[derive(Debug)]
+pub enum SystemStatus {
+    Unreachable,
+    Reachable {
+        current_generation: String,
+        needs_reboot: bool,
+        uptime_seconds: u64,
+        failed_units: usize,
+    },
+}
+
+pub fn check_system_status(host: &str) -> Result<SystemStatus, NixError> {
+    let status_script = r#"
+        set -euo pipefail
+
+        currentgen=$(readlink -f /nix/var/nix/profiles/system)
+        uptime_sec=$(cat /proc/uptime | cut -d' ' -f1)
+        failed_units=$(systemctl list-units --state=failed --no-legend | wc -l)
+
+        # Check if reboot is needed
+        booted="/run/booted-system"
+        needs_reboot=0
+        for component in initrd kernel kernel-modules; do
+            if ! cmp -s "$booted/$component" "$currentgen/$component"; then
+                needs_reboot=1
+                break
+            fi
+        done
+
+        echo "$currentgen"
+        echo "$uptime_sec"
+        echo "$failed_units"
+        echo "$needs_reboot"
+    "#;
+
+    let output = run_remote_script(host, status_script)?;
+
+    if !output.status.success() {
+        return Ok(SystemStatus::Unreachable);
+    }
+
+    let output_str = String::from_utf8_lossy(&output.stdout);
+    let mut lines = output_str.lines();
+
+    // If any of these fail to parse, the system is considered unreachable
+    let current_generation = match lines.next().map(|s| s.trim().to_string()) {
+        Some(gen) if !gen.is_empty() => gen,
+        _ => return Ok(SystemStatus::Unreachable),
+    };
+
+    let uptime_seconds = match lines.next().and_then(|s| {
+        s.split_whitespace()
+            .next()
+            .and_then(|n| n.parse::<f64>().ok().map(|f| f as u64))
+    }) {
+        Some(uptime) => uptime,
+        _ => return Ok(SystemStatus::Unreachable),
+    };
+
+    let failed_units = match lines.next().and_then(|s| s.parse::<usize>().ok()) {
+        Some(units) => units,
+        _ => return Ok(SystemStatus::Unreachable),
+    };
+
+    let needs_reboot = match lines.next().and_then(|s| s.parse::<u8>().ok()) {
+        Some(1) => true,
+        Some(0) => false,
+        _ => return Ok(SystemStatus::Unreachable),
+    };
+
+    Ok(SystemStatus::Reachable {
+        current_generation,
+        needs_reboot,
+        uptime_seconds,
+        failed_units,
+    })
+}
+
+// This function pipes the script via stdin to avoid bash quoting madness
+pub fn run_remote_script(host: &str, script: &str) -> Result<process::Output, NixError> {
+    let mut cmd = std::process::Command::new("ssh");
+    cmd.arg(host)
+        .arg("bash")
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::inherit());
+
+    let mut child = cmd
+        .spawn()
+        .map_err(|_| NixError::Eval("Failed to spawn SSH".to_string()))?;
+
+    if let Some(mut stdin) = child.stdin.take() {
+        use std::io::Write;
+        stdin
+            .write_all(script.as_bytes())
+            .map_err(|_| NixError::Eval("Failed to write to SSH stdin".to_string()))?;
+    }
+
+    child
+        .wait_with_output()
+        .map_err(|_| NixError::Eval("Failed to get SSH output".to_string()))
 }
 
 #[cfg(test)]

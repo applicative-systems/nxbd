@@ -9,8 +9,9 @@ use libnxbd::{
         save_failed_checks_to_ignore_file,
     },
     nixcommands::{
-        activate_profile, check_needs_reboot, copy_to_host, nixos_configuration_flakerefs,
+        activate_profile, check_system_status, copy_to_host, nixos_configuration_flakerefs,
         realise_drv_remotely, realise_toplevel_output_path, reboot_host, switch_to_configuration,
+        SystemStatus,
     },
     nixosattributes::{nixos_deploy_info, ConfigInfo},
     userinfo::UserInfo,
@@ -282,16 +283,17 @@ fn run() -> Result<(), NxbdError> {
                             .iter()
                             .find(|(s, _)| s == &system)
                             .and_then(|(_, i)| i.as_ref().ok())
-                            .and_then(|info| check_needs_reboot(Some(&info.fqdn_or_host_name)).ok())
-                            .map_or(("", false), |needs_reboot| {
-                                (
+                            .and_then(|info| check_system_status(&info.fqdn_or_host_name).ok())
+                            .map_or(("", false), |sys_status| match sys_status {
+                                SystemStatus::Reachable { needs_reboot, .. } => (
                                     if needs_reboot {
                                         " (reboot required)"
                                     } else {
                                         ""
                                     },
                                     needs_reboot,
-                                )
+                                ),
+                                SystemStatus::Unreachable => ("", false),
                             });
 
                         println!("  {} {}{}", "✓".green(), system, status_suffix);
@@ -373,10 +375,17 @@ fn run() -> Result<(), NxbdError> {
             activate_profile(&toplevel, true, None)?;
             switch_to_configuration(&toplevel, "switch", true, None)?;
 
-            match check_needs_reboot(None) {
-                Ok(true) => println!("System update complete. Reboot required."),
-                Ok(false) => println!("System update complete."),
-                Err(_) => println!("System update complete. Reboot status unknown."),
+            match check_system_status(&local_hostname)? {
+                SystemStatus::Reachable { needs_reboot, .. } => {
+                    if needs_reboot {
+                        println!("System update complete. Reboot required.");
+                    } else {
+                        println!("System update complete.");
+                    }
+                }
+                SystemStatus::Unreachable => {
+                    println!("System update complete. Reboot status unknown.");
+                }
             }
         }
         Command::Check {
@@ -549,6 +558,55 @@ fn run() -> Result<(), NxbdError> {
                         check.description,
                         check.advice.dimmed()
                     );
+                }
+            }
+        }
+        Command::Status { systems } => {
+            let system_attributes = flakerefs_or_default(systems)?;
+
+            println!("\nSystem Status:");
+            for system in &system_attributes {
+                println!("\n=== {} ===", system.to_string().cyan().bold());
+
+                match nixos_deploy_info(system) {
+                    Ok(info) => match check_system_status(&info.fqdn_or_host_name)? {
+                        SystemStatus::Unreachable => {
+                            println!("  {} System not reachable", "✗".red());
+                        }
+                        SystemStatus::Reachable {
+                            current_generation,
+                            needs_reboot,
+                            uptime_seconds,
+                            failed_units,
+                        } => {
+                            if failed_units > 0 {
+                                println!("  {} Failed systemd units: {}", "✗".red(), failed_units);
+                            } else {
+                                println!("  {} All systemd units OK", "✓".green());
+                            }
+
+                            let generation_status = current_generation == info.toplevel_out;
+                            println!(
+                                "  {} System generation {}",
+                                passed_symbol(generation_status),
+                                if generation_status {
+                                    "up to date"
+                                } else {
+                                    "outdated"
+                                }
+                            );
+
+                            if needs_reboot {
+                                println!("  {} Reboot required", "!".yellow());
+                            }
+
+                            let days = uptime_seconds / 86400;
+                            let hours = (uptime_seconds % 86400) / 3600;
+                            let minutes = (uptime_seconds % 3600) / 60;
+                            println!("    Uptime: {}d {}h {}m", days, hours, minutes);
+                        }
+                    },
+                    Err(e) => println!("  {} Error getting system info: {}", "✗".red(), e),
                 }
             }
         }
