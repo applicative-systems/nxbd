@@ -12,7 +12,7 @@ use libnxbd::{
         activate_profile, copy_to_host, nixos_configuration_flakerefs, realise_drv_remotely,
         realise_toplevel_output_path, switch_to_configuration,
     },
-    nixosattributes::nixos_deploy_info,
+    nixosattributes::{nixos_deploy_info, ConfigInfo},
     userinfo::UserInfo,
     FlakeReference, NixError,
 };
@@ -104,12 +104,12 @@ fn deploy_remote(
 
 fn run_system_checks(
     system: &FlakeReference,
+    info: &ConfigInfo,
     user_info: &UserInfo,
     ignore_file: &str,
 ) -> Result<Vec<(String, String)>, NixError> {
-    let info = nixos_deploy_info(system)?;
     let ignored_checks = load_ignored_checks(ignore_file);
-    let results = run_all_checks(&info, user_info);
+    let results = run_all_checks(info, user_info);
     let mut failures = Vec::new();
 
     for (group_id, _, check_results) in &results {
@@ -117,7 +117,7 @@ fn run_system_checks(
             if !passed
                 && !ignored_checks
                     .as_ref()
-                    .map(|ic| is_check_ignored(ic, system, group_id, check_id))
+                    .map(|ic| is_check_ignored(ic, &system, group_id, check_id))
                     .unwrap_or(false)
             {
                 failures.push((group_id.clone(), check_id.clone()));
@@ -204,36 +204,49 @@ fn run() -> Result<(), NxbdError> {
                     .join(" ")
             );
 
+            // Get all deploy infos first
+            let deploy_infos: Vec<(FlakeReference, Result<ConfigInfo, NixError>)> =
+                system_attributes
+                    .iter()
+                    .map(|sa| (sa.clone(), nixos_deploy_info(sa)))
+                    .collect();
+
             // Run checks first
-            for system in &system_attributes {
-                let failures = run_system_checks(system, &user_info, ".nxbd-ignore.yaml")?;
-                if !failures.is_empty() {
-                    return Err(NxbdError::ChecksFailed {
-                        failures,
-                        is_switch: true,
-                    });
+            for (system, info) in &deploy_infos {
+                match info {
+                    Ok(info) => {
+                        let failures =
+                            run_system_checks(system, info, &user_info, ".nxbd-ignore.yaml")?;
+                        if !failures.is_empty() {
+                            return Err(NxbdError::ChecksFailed {
+                                failures,
+                                is_switch: true,
+                            });
+                        }
+                    }
+                    Err(e) => return Err(e.clone().into()),
                 }
             }
 
-            let deploy_infos: Vec<(FlakeReference, Result<(), libnxbd::NixError>)> =
-                system_attributes
-                    .iter()
-                    .map(|sa| {
-                        let result = nixos_deploy_info(sa).and_then(|deploy_info| {
-                            deploy_remote(
-                                sa,
-                                &deploy_info.toplevel_out,
-                                &deploy_info.toplevel_drv,
-                                &deploy_info.fqdn_or_host_name,
-                                !user_info.can_build_natively(&deploy_info.system),
-                            )
-                        });
-                        (sa.clone(), result)
-                    })
-                    .collect();
+            // Do the deployment using the already fetched deploy infos
+            let results: Vec<(FlakeReference, Result<(), NixError>)> = deploy_infos
+                .into_iter()
+                .map(|(sa, info_result)| {
+                    let result = info_result.and_then(|deploy_info| {
+                        deploy_remote(
+                            &sa,
+                            &deploy_info.toplevel_out,
+                            &deploy_info.toplevel_drv,
+                            &deploy_info.fqdn_or_host_name,
+                            !user_info.can_build_natively(&deploy_info.system),
+                        )
+                    });
+                    (sa, result)
+                })
+                .collect();
 
             println!("\nDeployment Summary:");
-            for (system, result) in deploy_infos {
+            for (system, result) in results {
                 match result {
                     Ok(()) => println!("  {} {}", "✓".green(), system),
                     Err(e) => println!("  {} {} ({})", "✗".red(), system, e),
@@ -258,16 +271,21 @@ fn run() -> Result<(), NxbdError> {
             };
             println!("Switching system: {system_attribute}");
 
-            // Run checks first
-            let failures = run_system_checks(system_attribute, &user_info, ".nxbd-ignore.yaml")?;
+            let deploy_info = nixos_deploy_info(&system_attribute)?;
+
+            // Run checks first using the deploy info we already have
+            let failures = run_system_checks(
+                &system_attribute,
+                &deploy_info,
+                &user_info,
+                ".nxbd-ignore.yaml",
+            )?;
             if !failures.is_empty() {
                 return Err(NxbdError::ChecksFailed {
                     failures,
                     is_switch: true,
                 });
             }
-
-            let deploy_info = nixos_deploy_info(&system_attribute)?;
 
             // Check hostname match unless ignored
             if !ignore_hostname {
@@ -285,7 +303,7 @@ fn run() -> Result<(), NxbdError> {
                 }
             }
 
-            let toplevel = realise_toplevel_output_path(system_attribute)?;
+            let toplevel = realise_toplevel_output_path(&system_attribute)?;
             // We should change this in a way that realise_toplevel_output_path actually accepts the .drv file, but that may be impeding to nix-output-monitor
             assert_eq!(
                 toplevel, deploy_info.toplevel_out,
