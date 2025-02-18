@@ -61,7 +61,14 @@ fn deploy_remote(
     switch_to_configuration(&toplevel_out, "switch", true, Some(host))
 }
 
-fn main() -> Result<(), libnxbd::NixError> {
+fn main() {
+    if let Err(e) = run() {
+        eprintln!("Error: {}", e);
+        std::process::exit(1);
+    }
+}
+
+fn run() -> Result<(), libnxbd::NixError> {
     let cli = Cli::parse();
     let user_info = UserInfo::collect()?;
 
@@ -208,12 +215,28 @@ fn main() -> Result<(), libnxbd::NixError> {
 
             let ignored_checks = load_ignored_checks(&ignore_file);
             let mut all_results = Vec::new();
+            let mut had_failures = false;
 
             for system in &system_attributes {
                 println!("\n=== {} ===", system.to_string().cyan().bold());
                 match nixos_deploy_info(system) {
                     Ok(info) => {
                         let results = run_all_checks(&info, &user_info);
+
+                        // Check for unignored failures while displaying results
+                        for (group_id, _, check_results) in &results {
+                            for (check_id, passed) in check_results {
+                                if !passed
+                                    && !ignored_checks
+                                        .as_ref()
+                                        .map(|ic| is_check_ignored(ic, system, group_id, check_id))
+                                        .unwrap_or(false)
+                                {
+                                    had_failures = true;
+                                }
+                            }
+                        }
+
                         let results_for_display = results.clone();
 
                         for (group_id, _, check_results) in results_for_display {
@@ -280,10 +303,15 @@ fn main() -> Result<(), libnxbd::NixError> {
                         }
                         all_results.push((system, results));
                     }
-                    Err(e) => match e {
-                        NixError::Eval(msg) => println!("Error evaluating system info:\n{}", msg),
-                        _ => println!("Error getting system info: {:?}", e),
-                    },
+                    Err(e) => {
+                        had_failures = true;
+                        match e {
+                            NixError::Eval(msg) => {
+                                println!("Error evaluating system info:\n{}", msg)
+                            }
+                            _ => println!("Error getting system info: {:?}", e),
+                        }
+                    }
                 }
             }
 
@@ -293,6 +321,10 @@ fn main() -> Result<(), libnxbd::NixError> {
                 } else {
                     println!("Created {} with failed checks", ignore_file);
                 }
+            }
+
+            if had_failures {
+                return Err(NixError::Eval("One or more checks failed".to_string()));
             }
         }
         Command::Checks => {
@@ -316,6 +348,5 @@ fn main() -> Result<(), libnxbd::NixError> {
             }
         }
     }
-
     Ok(())
 }

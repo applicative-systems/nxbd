@@ -31,6 +31,8 @@ impl fmt::Display for NixError {
     }
 }
 
+impl std::error::Error for NixError {}
+
 pub fn nixos_configuration_attributes(flake_url: &str) -> Result<Vec<String>, NixError> {
     let build_output = process::Command::new("nix")
         .args([
