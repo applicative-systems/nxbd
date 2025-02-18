@@ -62,4 +62,7 @@ in
   ];
 
   system.switch.enable = true;
+
+  # silence eval warning
+  users.users."root".initialHashedPassword = lib.mkForce null;
 }
