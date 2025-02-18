@@ -10,7 +10,7 @@ let
 in
 
 {
-  name = "nxbd-switch-test";
+  name = "nxbd-switch-remote";
 
   node.pkgsReadOnly = false;
 

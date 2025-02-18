@@ -33,7 +33,7 @@ in
 
   virtualisation = {
     cores = 2;
-    memorySize = 8000; # went OOM with lower values
+    memorySize = 2048; # went OOM with lower values
   };
 
   system.build.privateKey = snakeOilPrivateKey;
