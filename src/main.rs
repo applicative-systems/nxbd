@@ -26,6 +26,10 @@ enum NxbdError {
         failures: Vec<(FlakeReference, Vec<(String, String)>)>, // (system, [(group_id, check_id)])
         is_switch: bool,
     },
+    LocalHostnameMismatch {
+        config_hostname: String,
+        local_hostname: String,
+    },
     Nix(NixError),
 }
 
@@ -49,6 +53,13 @@ impl fmt::Display for NxbdError {
                 } else {
                     write!(f, "To proceed, either:\n - Fix the failing checks\n - Run 'nxbd check --save-ignore' to ignore these checks")
                 }
+            }
+            Self::LocalHostnameMismatch {
+                config_hostname,
+                local_hostname,
+            } => {
+                write!(f, "Hostname mismatch: system config has '{}' but local system is '{}'\nTo proceed, either:\n - Fix the hostname\n - Rerun with --ignore-hostname", 
+                    config_hostname, local_hostname)
             }
             Self::Nix(e) => write!(f, "{}", e),
         }
@@ -325,15 +336,10 @@ fn run() -> Result<(), NxbdError> {
             // Check hostname match unless ignored
             if !ignore_hostname {
                 let config_hostname = &deploy_info.host_name;
-
                 if config_hostname != &local_hostname {
-                    return Err(NxbdError::ChecksFailed {
-                        failures: vec![(system_attribute.clone(), vec![(
-                            "hostname".to_string(),
-                            format!("system config has '{}' but local system is '{}'. Use --ignore-hostname to ignore this check.",
-                            config_hostname, local_hostname)
-                        )])],
-                        is_switch: true,
+                    return Err(NxbdError::LocalHostnameMismatch {
+                        config_hostname: config_hostname.clone(),
+                        local_hostname: local_hostname.clone(),
                     });
                 }
             }
