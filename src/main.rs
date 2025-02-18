@@ -18,6 +18,47 @@ use libnxbd::{
 };
 use nix::unistd;
 use owo_colors::OwoColorize;
+use std::fmt;
+
+#[derive(Debug)]
+enum NxbdError {
+    ChecksFailed {
+        failures: Vec<(String, String)>, // (group_id, check_id)
+        is_switch: bool,                 // true if from switch command, false if from check command
+    },
+    Nix(NixError),
+}
+
+impl fmt::Display for NxbdError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::ChecksFailed {
+                failures,
+                is_switch,
+            } => {
+                writeln!(f, "The following checks failed:")?;
+                for (group, check) in failures {
+                    writeln!(f, "  - {}.{}", group, check)?;
+                }
+                writeln!(f)?;
+                if *is_switch {
+                    write!(f, "To proceed, either:\n - Fix the failing checks\n - Run 'nxbd check --save-ignore' to ignore these checks\n - Rerun with --ignore-checks")
+                } else {
+                    write!(f, "To proceed, either:\n - Fix the failing checks\n - Run 'nxbd check --save-ignore' to ignore these checks")
+                }
+            }
+            Self::Nix(e) => write!(f, "{}", e),
+        }
+    }
+}
+
+impl std::error::Error for NxbdError {}
+
+impl From<NixError> for NxbdError {
+    fn from(err: NixError) -> Self {
+        NxbdError::Nix(err)
+    }
+}
 
 fn passed_symbol(passed: bool) -> String {
     if passed {
@@ -65,10 +106,11 @@ fn run_system_checks(
     system: &FlakeReference,
     user_info: &UserInfo,
     ignore_file: &str,
-) -> Result<(), NixError> {
+) -> Result<Vec<(String, String)>, NixError> {
     let info = nixos_deploy_info(system)?;
     let ignored_checks = load_ignored_checks(ignore_file);
     let results = run_all_checks(&info, user_info);
+    let mut failures = Vec::new();
 
     for (group_id, _, check_results) in &results {
         for (check_id, passed) in check_results {
@@ -78,14 +120,12 @@ fn run_system_checks(
                     .map(|ic| is_check_ignored(ic, system, group_id, check_id))
                     .unwrap_or(false)
             {
-                return Err(NixError::Eval(format!(
-                    "Check failed for {}: {}/{}",
-                    system, group_id, check_id
-                )));
+                failures.push((group_id.clone(), check_id.clone()));
             }
         }
     }
-    Ok(())
+
+    Ok(failures)
 }
 
 fn main() {
@@ -95,7 +135,7 @@ fn main() {
     }
 }
 
-fn run() -> Result<(), libnxbd::NixError> {
+fn run() -> Result<(), NxbdError> {
     let cli = Cli::parse();
     let user_info = UserInfo::collect()?;
 
@@ -166,7 +206,13 @@ fn run() -> Result<(), libnxbd::NixError> {
 
             // Run checks first
             for system in &system_attributes {
-                run_system_checks(system, &user_info, ".nxbd-ignore.yaml")?;
+                let failures = run_system_checks(system, &user_info, ".nxbd-ignore.yaml")?;
+                if !failures.is_empty() {
+                    return Err(NxbdError::ChecksFailed {
+                        failures,
+                        is_switch: true,
+                    });
+                }
             }
 
             let deploy_infos: Vec<(FlakeReference, Result<(), libnxbd::NixError>)> =
@@ -213,7 +259,13 @@ fn run() -> Result<(), libnxbd::NixError> {
             println!("Switching system: {system_attribute}");
 
             // Run checks first
-            run_system_checks(system_attribute, &user_info, ".nxbd-ignore.yaml")?;
+            let failures = run_system_checks(system_attribute, &user_info, ".nxbd-ignore.yaml")?;
+            if !failures.is_empty() {
+                return Err(NxbdError::ChecksFailed {
+                    failures,
+                    is_switch: true,
+                });
+            }
 
             let deploy_info = nixos_deploy_info(&system_attribute)?;
 
@@ -222,10 +274,14 @@ fn run() -> Result<(), libnxbd::NixError> {
                 let config_hostname = &deploy_info.host_name;
 
                 if config_hostname != &local_hostname {
-                    return Err(NixError::Eval(format!(
-                        "Hostname mismatch: system config has '{}' but local system is '{}'. Use --ignore-hostname to ignore this check.",
-                        config_hostname, local_hostname
-                    )));
+                    return Err(NxbdError::ChecksFailed {
+                        failures: vec![(
+                            "hostname".to_string(),
+                            format!("system config has '{}' but local system is '{}'. Use --ignore-hostname to ignore this check.",
+                            config_hostname, local_hostname)
+                        )],
+                        is_switch: true,
+                    });
                 }
             }
 
@@ -359,7 +415,10 @@ fn run() -> Result<(), libnxbd::NixError> {
             }
 
             if had_failures {
-                return Err(NixError::Eval("One or more checks failed".to_string()));
+                return Err(NxbdError::ChecksFailed {
+                    failures: Vec::new(),
+                    is_switch: false,
+                });
             }
         }
         Command::Checks => {
