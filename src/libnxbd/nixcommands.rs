@@ -363,6 +363,27 @@ pub fn check_needs_reboot(host: Option<&str>) -> Result<bool, NixError> {
     Ok(!output.status.success())
 }
 
+pub fn reboot_host(host: &str) -> Result<(), NixError> {
+    // Use systemctl to reboot, which will gracefully terminate the SSH connection
+    let mut cmd = command::build_remote_command(Some(host), true);
+    cmd.extend(["systemctl", "reboot"].iter().map(|&s| s.to_string()));
+
+    let output = command::run_command(
+        &cmd[0],
+        &cmd[1..].iter().map(String::as_str).collect::<Vec<_>>(),
+        NixError::Eval("Failed to initiate reboot".to_string()),
+    )?;
+
+    // If we get here, the command was sent successfully
+    // The SSH connection will be terminated by the reboot
+    // We consider this a success
+    if !output.status.success() {
+        return Err(NixError::Eval("Reboot command failed".to_string()));
+    }
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

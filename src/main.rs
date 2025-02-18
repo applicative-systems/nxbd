@@ -10,7 +10,7 @@ use libnxbd::{
     },
     nixcommands::{
         activate_profile, check_needs_reboot, copy_to_host, nixos_configuration_flakerefs,
-        realise_drv_remotely, realise_toplevel_output_path, switch_to_configuration,
+        realise_drv_remotely, realise_toplevel_output_path, reboot_host, switch_to_configuration,
     },
     nixosattributes::{nixos_deploy_info, ConfigInfo},
     userinfo::UserInfo,
@@ -210,6 +210,7 @@ fn run() -> Result<(), NxbdError> {
         Command::SwitchRemote {
             systems,
             ignore_checks,
+            reboot,
         } => {
             let system_attributes = flakerefs_or_default(systems)?;
             println!(
@@ -277,20 +278,37 @@ fn run() -> Result<(), NxbdError> {
             for (system, result) in results {
                 match result {
                     Ok(()) => {
-                        let reboot_status = deploy_infos
+                        let (status_suffix, do_reboot) = deploy_infos
                             .iter()
                             .find(|(s, _)| s == &system)
                             .and_then(|(_, i)| i.as_ref().ok())
                             .and_then(|info| check_needs_reboot(Some(&info.fqdn_or_host_name)).ok())
-                            .map_or("", |needs_reboot| {
-                                if needs_reboot {
-                                    " (reboot required)"
-                                } else {
-                                    ""
-                                }
+                            .map_or(("", false), |needs_reboot| {
+                                (
+                                    if needs_reboot {
+                                        " (reboot required)"
+                                    } else {
+                                        ""
+                                    },
+                                    needs_reboot,
+                                )
                             });
 
-                        println!("  {} {}{}", "✓".green(), system, reboot_status);
+                        println!("  {} {}{}", "✓".green(), system, status_suffix);
+
+                        if do_reboot && *reboot {
+                            if let Some(info) = deploy_infos
+                                .iter()
+                                .find(|(s, _)| s == &system)
+                                .and_then(|(_, i)| i.as_ref().ok())
+                            {
+                                print!("    Rebooting... ");
+                                match reboot_host(&info.fqdn_or_host_name) {
+                                    Ok(()) => println!("initiated"),
+                                    Err(e) => println!("failed: {}", e),
+                                }
+                            }
+                        }
                     }
                     Err(e) => println!("  {} {} ({})", "✗".red(), system, e),
                 }

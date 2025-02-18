@@ -23,6 +23,8 @@ pub enum Command {
         systems: Vec<libnxbd::FlakeReference>,
         #[arg(long)]
         ignore_checks: bool,
+        #[arg(long)]
+        reboot: bool,
     },
     SwitchLocal {
         #[arg(value_parser = libnxbd::flakeref::parse_flake_reference)]
