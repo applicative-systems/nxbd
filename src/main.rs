@@ -196,7 +196,10 @@ fn run() -> Result<(), NxbdError> {
                 );
             }
         }
-        Command::SwitchRemote { systems } => {
+        Command::SwitchRemote {
+            systems,
+            ignore_checks,
+        } => {
             let system_attributes = flakerefs_or_default(systems)?;
             println!(
                 "Switching systems: {}",
@@ -214,26 +217,28 @@ fn run() -> Result<(), NxbdError> {
                     .map(|sa| (sa.clone(), nixos_deploy_info(sa)))
                     .collect();
 
-            // Run checks first
-            let mut all_failures = Vec::new();
-            for (system, info) in &deploy_infos {
-                match info {
-                    Ok(info) => {
-                        let failures =
-                            run_system_checks(system, info, &user_info, ".nxbd-ignore.yaml")?;
-                        if !failures.is_empty() {
-                            all_failures.push((system.clone(), failures));
+            // Run checks first (unless ignored)
+            if !ignore_checks {
+                let mut all_failures = Vec::new();
+                for (system, info) in &deploy_infos {
+                    match info {
+                        Ok(info) => {
+                            let failures =
+                                run_system_checks(system, info, &user_info, ".nxbd-ignore.yaml")?;
+                            if !failures.is_empty() {
+                                all_failures.push((system.clone(), failures));
+                            }
                         }
+                        Err(e) => return Err(e.clone().into()),
                     }
-                    Err(e) => return Err(e.clone().into()),
                 }
-            }
 
-            if !all_failures.is_empty() {
-                return Err(NxbdError::ChecksFailed {
-                    failures: all_failures,
-                    is_switch: true,
-                });
+                if !all_failures.is_empty() {
+                    return Err(NxbdError::ChecksFailed {
+                        failures: all_failures,
+                        is_switch: true,
+                    });
+                }
             }
 
             // Do the deployment using the already fetched deploy infos
@@ -264,6 +269,7 @@ fn run() -> Result<(), NxbdError> {
         Command::SwitchLocal {
             system,
             ignore_hostname,
+            ignore_checks,
         } => {
             let local_hostname = unistd::gethostname()
                 .expect("Failed getting hostname")
@@ -281,18 +287,20 @@ fn run() -> Result<(), NxbdError> {
 
             let deploy_info = nixos_deploy_info(&system_attribute)?;
 
-            // Run checks first using the deploy info we already have
-            let failures = run_system_checks(
-                &system_attribute,
-                &deploy_info,
-                &user_info,
-                ".nxbd-ignore.yaml",
-            )?;
-            if !failures.is_empty() {
-                return Err(NxbdError::ChecksFailed {
-                    failures: vec![(system_attribute.clone(), failures)],
-                    is_switch: true,
-                });
+            // Run checks first (unless ignored)
+            if !ignore_checks {
+                let failures = run_system_checks(
+                    &system_attribute,
+                    &deploy_info,
+                    &user_info,
+                    ".nxbd-ignore.yaml",
+                )?;
+                if !failures.is_empty() {
+                    return Err(NxbdError::ChecksFailed {
+                        failures: vec![(system_attribute.clone(), failures)],
+                        is_switch: true,
+                    });
+                }
             }
 
             // Check hostname match unless ignored

@@ -21,12 +21,16 @@ pub enum Command {
     SwitchRemote {
         #[arg(value_parser = libnxbd::flakeref::parse_flake_reference)]
         systems: Vec<libnxbd::FlakeReference>,
+        #[arg(long)]
+        ignore_checks: bool,
     },
     SwitchLocal {
         #[arg(value_parser = libnxbd::flakeref::parse_flake_reference)]
         system: Option<libnxbd::FlakeReference>,
         #[arg(long)]
         ignore_hostname: bool,
+        #[arg(long)]
+        ignore_checks: bool,
     },
     Check {
         #[arg(value_parser = libnxbd::flakeref::parse_flake_reference)]
