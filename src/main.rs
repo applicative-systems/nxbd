@@ -472,8 +472,38 @@ fn run() -> Result<(), NxbdError> {
                     println!("Created {} with failed checks", ignore_file);
                 }
             } else if had_failures {
+                let failures: Vec<(FlakeReference, Vec<(String, String)>)> = all_results
+                    .iter()
+                    .filter_map(|(system, results)| {
+                        let failures: Vec<(String, String)> = results
+                            .iter()
+                            .flat_map(|(group_id, _, check_results)| {
+                                check_results
+                                    .iter()
+                                    .filter(|(check_id, passed)| {
+                                        !passed
+                                            && !ignored_checks
+                                                .as_ref()
+                                                .map(|ic| {
+                                                    is_check_ignored(
+                                                        ic, &system, group_id, check_id,
+                                                    )
+                                                })
+                                                .unwrap_or(false)
+                                    })
+                                    .map(|(check_id, _)| (group_id.clone(), check_id.clone()))
+                            })
+                            .collect();
+                        if !failures.is_empty() {
+                            Some(((*system).clone(), failures))
+                        } else {
+                            None
+                        }
+                    })
+                    .collect();
+
                 return Err(NxbdError::ChecksFailed {
-                    failures: Vec::new(),
+                    failures,
                     is_switch: false,
                 });
             }
