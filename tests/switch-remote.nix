@@ -64,7 +64,9 @@ in
       # in case it fails, we know if the config is broken or nxbd.
       deployer.succeed("nix -L build .#nixosConfigurations.server.config.system.build.toplevel")
 
-      deployer.succeed("nxbd check")
+      deployer.fail("nxbd check")
+      deployer.succeed("nxbd check --save-ignore")
+
       deployer.succeed("nxbd build")
       deployer.succeed("nxbd switch-remote")
     '';

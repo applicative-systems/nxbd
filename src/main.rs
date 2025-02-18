@@ -471,9 +471,7 @@ fn run() -> Result<(), NxbdError> {
                 } else {
                     println!("Created {} with failed checks", ignore_file);
                 }
-            }
-
-            if had_failures {
+            } else if had_failures {
                 return Err(NxbdError::ChecksFailed {
                     failures: Vec::new(),
                     is_switch: false,

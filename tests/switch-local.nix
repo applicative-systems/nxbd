@@ -21,9 +21,9 @@
     # in case it fails, we know if the config is broken or nxbd.
     server.succeed("nix -L build .#nixosConfigurations.server.config.system.build.toplevel")
 
-    # TODO: Actually make check return a nonzero return code.
-    # this way we can test if the ignore list works well.
-    server.succeed("nxbd check")
+    server.fail("nxbd check")
+    server.succeed("nxbd check --save-ignore")
+
     server.succeed("nxbd build")
     server.succeed("nxbd switch-local")
   '';
