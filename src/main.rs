@@ -23,8 +23,8 @@ use std::fmt;
 #[derive(Debug)]
 enum NxbdError {
     ChecksFailed {
-        failures: Vec<(String, String)>, // (group_id, check_id)
-        is_switch: bool,                 // true if from switch command, false if from check command
+        failures: Vec<(FlakeReference, Vec<(String, String)>)>, // (system, [(group_id, check_id)])
+        is_switch: bool,
     },
     Nix(NixError),
 }
@@ -37,8 +37,11 @@ impl fmt::Display for NxbdError {
                 is_switch,
             } => {
                 writeln!(f, "The following checks failed:")?;
-                for (group, check) in failures {
-                    writeln!(f, "  - {}.{}", group, check)?;
+                for (system, checks) in failures {
+                    writeln!(f, "\nSystem {}:", system)?;
+                    for (group, check) in checks {
+                        writeln!(f, "  - {}.{}", group, check)?;
+                    }
                 }
                 writeln!(f)?;
                 if *is_switch {
@@ -212,20 +215,25 @@ fn run() -> Result<(), NxbdError> {
                     .collect();
 
             // Run checks first
+            let mut all_failures = Vec::new();
             for (system, info) in &deploy_infos {
                 match info {
                     Ok(info) => {
                         let failures =
                             run_system_checks(system, info, &user_info, ".nxbd-ignore.yaml")?;
                         if !failures.is_empty() {
-                            return Err(NxbdError::ChecksFailed {
-                                failures,
-                                is_switch: true,
-                            });
+                            all_failures.push((system.clone(), failures));
                         }
                     }
                     Err(e) => return Err(e.clone().into()),
                 }
+            }
+
+            if !all_failures.is_empty() {
+                return Err(NxbdError::ChecksFailed {
+                    failures: all_failures,
+                    is_switch: true,
+                });
             }
 
             // Do the deployment using the already fetched deploy infos
@@ -282,7 +290,7 @@ fn run() -> Result<(), NxbdError> {
             )?;
             if !failures.is_empty() {
                 return Err(NxbdError::ChecksFailed {
-                    failures,
+                    failures: vec![(system_attribute.clone(), failures)],
                     is_switch: true,
                 });
             }
@@ -293,11 +301,11 @@ fn run() -> Result<(), NxbdError> {
 
                 if config_hostname != &local_hostname {
                     return Err(NxbdError::ChecksFailed {
-                        failures: vec![(
+                        failures: vec![(system_attribute.clone(), vec![(
                             "hostname".to_string(),
                             format!("system config has '{}' but local system is '{}'. Use --ignore-hostname to ignore this check.",
                             config_hostname, local_hostname)
-                        )],
+                        )])],
                         is_switch: true,
                     });
                 }
