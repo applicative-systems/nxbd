@@ -61,6 +61,33 @@ fn deploy_remote(
     switch_to_configuration(&toplevel_out, "switch", true, Some(host))
 }
 
+fn run_system_checks(
+    system: &FlakeReference,
+    user_info: &UserInfo,
+    ignore_file: &str,
+) -> Result<(), NixError> {
+    let info = nixos_deploy_info(system)?;
+    let ignored_checks = load_ignored_checks(ignore_file);
+    let results = run_all_checks(&info, user_info);
+
+    for (group_id, _, check_results) in &results {
+        for (check_id, passed) in check_results {
+            if !passed
+                && !ignored_checks
+                    .as_ref()
+                    .map(|ic| is_check_ignored(ic, system, group_id, check_id))
+                    .unwrap_or(false)
+            {
+                return Err(NixError::Eval(format!(
+                    "Check failed for {}: {}/{}",
+                    system, group_id, check_id
+                )));
+            }
+        }
+    }
+    Ok(())
+}
+
 fn main() {
     if let Err(e) = run() {
         eprintln!("Error: {}", e);
@@ -137,6 +164,11 @@ fn run() -> Result<(), libnxbd::NixError> {
                     .join(" ")
             );
 
+            // Run checks first
+            for system in &system_attributes {
+                run_system_checks(system, &user_info, ".nxbd-ignore.yaml")?;
+            }
+
             let deploy_infos: Vec<(FlakeReference, Result<(), libnxbd::NixError>)> =
                 system_attributes
                     .iter()
@@ -179,6 +211,9 @@ fn run() -> Result<(), libnxbd::NixError> {
                 },
             };
             println!("Switching system: {system_attribute}");
+
+            // Run checks first
+            run_system_checks(system_attribute, &user_info, ".nxbd-ignore.yaml")?;
 
             let deploy_info = nixos_deploy_info(&system_attribute)?;
 
