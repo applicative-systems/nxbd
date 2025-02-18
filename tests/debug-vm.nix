@@ -1,4 +1,4 @@
-{
+port: {
   services.openssh = {
     enable = true;
     settings = {
@@ -10,7 +10,7 @@
   virtualisation.forwardPorts = [
     {
       from = "host";
-      host.port = 2222;
+      host.port = port;
       guest.port = 22;
     }
   ];

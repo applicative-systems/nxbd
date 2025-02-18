@@ -17,38 +17,32 @@
     "virtio_blk"
   ];
   boot.initrd.kernelModules = [ ];
-  boot.kernelModules = [ "kvm-amd" ];
+  # boot.kernelModules = [ "kvm-amd" ];
   boot.extraModulePackages = [ ];
 
-  fileSystems."/" = {
-    device = "/dev/vda1"; # "/dev/disk/by-uuid/f222513b-ded1-49fa-b591-20ce86a2fe7f";
-    fsType = "ext4";
-  };
+  #fileSystems."/" = {
+  #  device = "/dev/vda1"; # "/dev/disk/by-uuid/f222513b-ded1-49fa-b591-20ce86a2fe7f";
+  #  fsType = "ext4";
+  #};
 
-  fileSystems."/nix/.rw-store" = {
-    device = "tmpfs";
-    fsType = "tmpfs";
-  };
+  #fileSystems."/nix/.rw-store" = {
+  #  device = "tmpfs";
+  #  fsType = "tmpfs";
+  #};
 
-  fileSystems."/tmp/shared" = {
-    device = "shared";
-    fsType = "9p";
-  };
+  #fileSystems."/tmp/shared" = {
+  #  device = "shared";
+  #  fsType = "9p";
+  #};
 
-  fileSystems."/tmp/xchg" = {
-    device = "xchg";
-    fsType = "9p";
-  };
+  #fileSystems."/tmp/xchg" = {
+  #  device = "xchg";
+  #  fsType = "9p";
+  #};
 
-  swapDevices = [ ];
+  #swapDevices = [ ];
 
-  # Enables DHCP on each ethernet and wireless interface. In case of scripted networking
-  # (the default) this is the recommended approach. When using systemd-networkd it's
-  # still possible to use this option, but it's recommended to use it in conjunction
-  # with explicit per-interface declarations with `networking.interfaces.<interface>.useDHCP`.
   networking.useDHCP = lib.mkDefault true;
-  # networking.interfaces.eth0.useDHCP = lib.mkDefault true;
-  # networking.interfaces.eth1.useDHCP = lib.mkDefault true;
 
   nixpkgs.hostPlatform = lib.mkDefault "x86_64-linux";
 }

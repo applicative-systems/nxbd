@@ -6,7 +6,7 @@
   };
 
   outputs = inputs: {
-    nixosConfigurations.machine = inputs.nixpkgs.lib.nixosSystem {
+    nixosConfigurations.server = inputs.nixpkgs.lib.nixosSystem {
       modules = [ ./configuration.nix ];
     };
   };
