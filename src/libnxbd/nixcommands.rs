@@ -335,6 +335,34 @@ pub fn realise_toplevel_output_path(flake_reference: &FlakeReference) -> Result<
     json::get_json_string(&single_value, &["outputs", "out"])
 }
 
+pub fn check_needs_reboot(host: Option<&str>) -> Result<bool, NixError> {
+    let check_command = r#"
+        booted="/run/booted-system"
+        current="/nix/var/nix/profiles/system"
+        needs_reboot=0
+
+        for component in initrd kernel kernel-modules; do
+            if ! cmp -s "$booted/$component" "$current/$component"; then
+                needs_reboot=1
+                break
+            fi
+        done
+
+        exit $needs_reboot
+    "#;
+
+    let mut cmd = command::build_remote_command(host, false);
+    cmd.extend(["bash", "-c", check_command].iter().map(|&s| s.to_string()));
+
+    let output = command::run_command(
+        &cmd[0],
+        &cmd[1..].iter().map(String::as_str).collect::<Vec<_>>(),
+        NixError::Eval("Failed to check reboot status".to_string()),
+    )?;
+
+    Ok(!output.status.success())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

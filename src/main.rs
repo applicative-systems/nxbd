@@ -9,8 +9,8 @@ use libnxbd::{
         save_failed_checks_to_ignore_file,
     },
     nixcommands::{
-        activate_profile, copy_to_host, nixos_configuration_flakerefs, realise_drv_remotely,
-        realise_toplevel_output_path, switch_to_configuration,
+        activate_profile, check_needs_reboot, copy_to_host, nixos_configuration_flakerefs,
+        realise_drv_remotely, realise_toplevel_output_path, switch_to_configuration,
     },
     nixosattributes::{nixos_deploy_info, ConfigInfo},
     userinfo::UserInfo,
@@ -243,25 +243,44 @@ fn run() -> Result<(), NxbdError> {
 
             // Do the deployment using the already fetched deploy infos
             let results: Vec<(FlakeReference, Result<(), NixError>)> = deploy_infos
-                .into_iter()
+                .iter()
                 .map(|(sa, info_result)| {
-                    let result = info_result.and_then(|deploy_info| {
-                        deploy_remote(
-                            &sa,
-                            &deploy_info.toplevel_out,
-                            &deploy_info.toplevel_drv,
-                            &deploy_info.fqdn_or_host_name,
-                            !user_info.can_build_natively(&deploy_info.system),
-                        )
-                    });
-                    (sa, result)
+                    let result =
+                        info_result
+                            .as_ref()
+                            .map_err(|e| e.clone())
+                            .and_then(|deploy_info| {
+                                deploy_remote(
+                                    sa,
+                                    &deploy_info.toplevel_out,
+                                    &deploy_info.toplevel_drv,
+                                    &deploy_info.fqdn_or_host_name,
+                                    !user_info.can_build_natively(&deploy_info.system),
+                                )
+                            });
+                    (sa.clone(), result)
                 })
                 .collect();
 
             println!("\nDeployment Summary:");
             for (system, result) in results {
                 match result {
-                    Ok(()) => println!("  {} {}", "✓".green(), system),
+                    Ok(()) => {
+                        let reboot_status = deploy_infos
+                            .iter()
+                            .find(|(s, _)| s == &system)
+                            .and_then(|(_, i)| i.as_ref().ok())
+                            .and_then(|info| check_needs_reboot(Some(&info.fqdn_or_host_name)).ok())
+                            .map_or("", |needs_reboot| {
+                                if needs_reboot {
+                                    " (reboot required)"
+                                } else {
+                                    ""
+                                }
+                            });
+
+                        println!("  {} {}{}", "✓".green(), system, reboot_status);
+                    }
                     Err(e) => println!("  {} {} ({})", "✗".red(), system, e),
                 }
             }
@@ -329,6 +348,12 @@ fn run() -> Result<(), NxbdError> {
             println!("Store path is [{toplevel}]");
             activate_profile(&toplevel, true, None)?;
             switch_to_configuration(&toplevel, "switch", true, None)?;
+
+            match check_needs_reboot(None) {
+                Ok(true) => println!("System update complete. Reboot required."),
+                Ok(false) => println!("System update complete."),
+                Err(_) => println!("System update complete. Reboot status unknown."),
+            }
         }
         Command::Check {
             systems,
