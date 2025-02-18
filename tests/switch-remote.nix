@@ -51,6 +51,8 @@ in
       # Network of the initial VM needs to be restored so we're not offline
       # after the system switch
       deployer.succeed("sed -i 's@# EXTRA_IMPORTS@(lib.modules.importJSON ./target-network.json)@' configuration.nix")
+      # Linter keeps removing the `lib` parameter
+      deployer.succeed("sed -i 's@modulesPath, @lib, modulesPath, @' configuration.nix")
       deployer.succeed("grep -q target-network.json configuration.nix")
       deployer.succeed("nix flake lock --override-input nixpkgs ${pkgs.path}")
 
