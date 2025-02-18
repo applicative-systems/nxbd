@@ -1,9 +1,9 @@
-{ modulesPath, ... }:
+{ lib, modulesPath, ... }:
 {
   imports = [
+    (modulesPath + "/profiles/qemu-guest.nix")
     (modulesPath + "/testing/test-instrumentation.nix")
     (modulesPath + "/virtualisation/qemu-vm.nix")
-    ./hardware-configuration.nix
     # EXTRA_IMPORTS
   ];
 

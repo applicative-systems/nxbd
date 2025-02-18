@@ -38,7 +38,6 @@ in
     ''
       start_all()
       deployer.wait_for_unit("multi-user.target")
-      server.wait_for_unit("multi-user.target")
 
       deployer.succeed("mkdir /root/.ssh")
       deployer.copy_from_host("${snakeOilPrivateKey}", "/root/.ssh/id_ecdsa")
@@ -52,9 +51,10 @@ in
       # Network of the initial VM needs to be restored so we're not offline
       # after the system switch
       deployer.succeed("sed -i 's@# EXTRA_IMPORTS@(lib.modules.importJSON ./target-network.json)@' configuration.nix")
-      deployer.succeed("grep -q EXTRA_IMPORTS configuration.nix")
+      deployer.succeed("grep -q target-network.json configuration.nix")
       deployer.succeed("nix flake lock --override-input nixpkgs ${pkgs.path}")
 
+      server.wait_for_unit("multi-user.target")
       deployer.wait_until_succeeds("ping -c1 server")
       deployer.succeed("ssh -v -o ConnectTimeout=1 -o ConnectionAttempts=1 server echo hello")
 
