@@ -19,6 +19,7 @@ use libnxbd::{
 };
 use nix::unistd;
 use owo_colors::OwoColorize;
+use rayon::prelude::*;
 use std::fmt;
 
 #[derive(Debug)]
@@ -563,49 +564,99 @@ fn run() -> Result<(), NxbdError> {
         Command::Status { systems } => {
             let system_attributes = flakerefs_or_default(systems)?;
 
+            eprintln!(
+                "Reading configurations of {}...",
+                system_attributes
+                    .iter()
+                    .map(|s| format!(".#{}", s.attribute))
+                    .collect::<Vec<_>>()
+                    .join(" ")
+            );
+
+            let deploy_infos: Vec<(FlakeReference, Result<ConfigInfo, NixError>)> =
+                system_attributes
+                    .par_iter()
+                    .map(|system| (system.clone(), nixos_deploy_info(system)))
+                    .collect();
+
+            println!(
+                "Querying status of {}...",
+                deploy_infos
+                    .iter()
+                    .filter_map(|(_, info)| info.as_ref().ok())
+                    .map(|info| info.fqdn_or_host_name.as_str())
+                    .collect::<Vec<_>>()
+                    .join(" ")
+            );
+
+            let system_statuses: Vec<(
+                FlakeReference,
+                &ConfigInfo,
+                Result<SystemStatus, NixError>,
+            )> = deploy_infos
+                .iter()
+                .filter_map(|(system, deploy_result)| {
+                    deploy_result
+                        .as_ref()
+                        .ok()
+                        .map(|info| (system.clone(), info))
+                })
+                .par_bridge()
+                .map(|(system, info)| (system, info, check_system_status(&info.fqdn_or_host_name)))
+                .collect();
+
+            // Finally, print all results
             println!("\nSystem Status:");
-            for system in &system_attributes {
+            for (system, info, status) in system_statuses {
                 println!("\n=== {} ===", system.to_string().cyan().bold());
 
-                match nixos_deploy_info(system) {
-                    Ok(info) => match check_system_status(&info.fqdn_or_host_name)? {
-                        SystemStatus::Unreachable => {
-                            println!("  {} System not reachable", "✗".red());
-                        }
-                        SystemStatus::Reachable {
-                            current_generation,
-                            needs_reboot,
-                            uptime_seconds,
-                            failed_units,
-                        } => {
-                            if failed_units > 0 {
-                                println!("  {} Failed systemd units: {}", "✗".red(), failed_units);
+                match status {
+                    Ok(SystemStatus::Unreachable) => {
+                        println!("  {} System not reachable", "✗".red());
+                    }
+                    Ok(SystemStatus::Reachable {
+                        current_generation,
+                        needs_reboot,
+                        uptime_seconds,
+                        failed_units,
+                    }) => {
+                        println!(
+                            "  {} systemd units: {}",
+                            passed_symbol(failed_units == 0),
+                            if failed_units == 0 {
+                                "all OK".to_string()
                             } else {
-                                println!("  {} All systemd units OK", "✓".green());
+                                format!("{} failed", failed_units).to_string()
                             }
+                        );
 
-                            let generation_status = current_generation == info.toplevel_out;
-                            println!(
-                                "  {} System generation {}",
-                                passed_symbol(generation_status),
-                                if generation_status {
-                                    "up to date"
-                                } else {
-                                    "outdated"
-                                }
-                            );
+                        let generation_status = current_generation == info.toplevel_out;
+                        println!(
+                            "  {} System generation {}",
+                            passed_symbol(generation_status),
+                            if generation_status {
+                                "up to date"
+                            } else {
+                                "outdated"
+                            }
+                        );
 
+                        println!(
+                            "  {} Reboot required: {}",
                             if needs_reboot {
-                                println!("  {} Reboot required", "!".yellow());
-                            }
+                                "!".yellow().to_string()
+                            } else {
+                                "✓".green().to_string()
+                            },
+                            if needs_reboot { "yes" } else { "no" }
+                        );
 
-                            let days = uptime_seconds / 86400;
-                            let hours = (uptime_seconds % 86400) / 3600;
-                            let minutes = (uptime_seconds % 3600) / 60;
-                            println!("    Uptime: {}d {}h {}m", days, hours, minutes);
-                        }
-                    },
-                    Err(e) => println!("  {} Error getting system info: {}", "✗".red(), e),
+                        let days = uptime_seconds / 86400;
+                        let hours = (uptime_seconds % 86400) / 3600;
+                        let minutes = (uptime_seconds % 3600) / 60;
+                        println!("    Uptime: {}d {}h {}m", days, hours, minutes);
+                    }
+                    Err(e) => println!("  {} Error getting system status: {}", "✗".red(), e),
                 }
             }
         }
