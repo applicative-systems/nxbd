@@ -53,7 +53,8 @@ in
       deployer.succeed("sed -i 's@# EXTRA_IMPORTS@(lib.modules.importJSON ./target-network.json)@' configuration.nix")
       # Linter keeps removing the `lib` parameter
       deployer.succeed("sed -i 's@modulesPath, @lib, modulesPath, @' configuration.nix")
-      deployer.succeed("grep -q target-network.json configuration.nix")
+      config_str = deployer.succeed("cat configuration.nix")
+      assert "target-network.json" in config_str, "config must be patched properly"
       deployer.succeed("nix flake lock --override-input nixpkgs ${pkgs.path}")
 
       server.wait_for_unit("multi-user.target")
