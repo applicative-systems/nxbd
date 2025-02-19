@@ -10,7 +10,7 @@ use libnxbd::{
     },
     nixcommands::{
         activate_profile, check_system_status, copy_to_host, nixos_configuration_flakerefs,
-        realise_drv_remotely, realise_toplevel_output_path, reboot_host, switch_to_configuration,
+        realise_drv_remotely, realise_toplevel_output_paths, reboot_host, switch_to_configuration,
         SystemStatus,
     },
     nixosattributes::{nixos_deploy_info, ConfigInfo},
@@ -250,32 +250,32 @@ fn run() -> Result<(), NxbdError> {
 
             // Deploy systems that can be built locally
             println!("\nDeploying locally-built systems:");
+            if !local_builds.is_empty() {
+                let local_systems: Vec<FlakeReference> =
+                    local_builds.iter().map(|(sa, _)| (*sa).clone()).collect();
+                realise_toplevel_output_paths(&local_systems)?;
+            }
+
             let local_results: Vec<(FlakeReference, Result<(), NixError>)> = local_builds
                 .into_iter()
                 .map(|(sa, deploy_info)| {
-                    let result = realise_toplevel_output_path(sa)
-                        .and_then(|outpath| {
-                            assert_eq!(
-                                outpath, deploy_info.toplevel_out,
-                                "Built output path does not match evaluated output path"
-                            );
-                            copy_to_host(&deploy_info.toplevel_out, &deploy_info.fqdn_or_host_name)
-                        })
-                        .and_then(|_| {
-                            activate_profile(
-                                &deploy_info.toplevel_out,
-                                true,
-                                Some(&deploy_info.fqdn_or_host_name),
-                            )
-                        })
-                        .and_then(|_| {
-                            switch_to_configuration(
-                                &deploy_info.toplevel_out,
-                                "switch",
-                                true,
-                                Some(&deploy_info.fqdn_or_host_name),
-                            )
-                        });
+                    let result =
+                        copy_to_host(&deploy_info.toplevel_out, &deploy_info.fqdn_or_host_name)
+                            .and_then(|_| {
+                                activate_profile(
+                                    &deploy_info.toplevel_out,
+                                    true,
+                                    Some(&deploy_info.fqdn_or_host_name),
+                                )
+                            })
+                            .and_then(|_| {
+                                switch_to_configuration(
+                                    &deploy_info.toplevel_out,
+                                    "switch",
+                                    true,
+                                    Some(&deploy_info.fqdn_or_host_name),
+                                )
+                            });
                     (sa.clone(), result)
                 })
                 .collect();
@@ -412,14 +412,8 @@ fn run() -> Result<(), NxbdError> {
                 }
             }
 
-            let toplevel = realise_toplevel_output_path(&system_attribute)?;
-            // We should change this in a way that realise_toplevel_output_path actually accepts the .drv file, but that may be impeding to nix-output-monitor
-            assert_eq!(
-                toplevel, deploy_info.toplevel_out,
-                "Built output path does not match evaluated output path"
-            );
-
-            println!("Store path is [{toplevel}]");
+            let toplevel = deploy_info.toplevel_out.clone();
+            realise_toplevel_output_paths(&[system_attribute.clone()])?;
             activate_profile(&toplevel, true, None)?;
             switch_to_configuration(&toplevel, "switch", true, None)?;
 

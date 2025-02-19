@@ -124,36 +124,6 @@ mod json {
         serde_json::from_str(stdout_str)
             .map_err(|_| NixError::Eval("Failed to parse JSON output".to_string()))
     }
-
-    pub fn get_json_string(value: &Value, path: &[&str]) -> Result<String, NixError> {
-        let mut current = value;
-        for &key in path {
-            current = current
-                .get(key)
-                .ok_or_else(|| NixError::Eval(format!("Missing key: {}", key)))?;
-        }
-        current
-            .as_str()
-            .map(String::from)
-            .ok_or_else(|| NixError::Eval("Value is not a string".to_string()))
-    }
-
-    pub fn extract_single_object_from_array(value: &Value) -> Result<&Value, NixError> {
-        if let Value::Array(arr) = value {
-            match arr.len() {
-                0 => Err(NixError::Eval(
-                    "Expected array with one item, got empty array".to_string(),
-                )),
-                1 => Ok(&arr[0]),
-                _ => Err(NixError::Eval(
-                    "Expected array with one item, got multiple items".to_string(),
-                )),
-            }
-        } else {
-            // Not an array, return as-is
-            Ok(value)
-        }
-    }
 }
 
 pub fn activate_profile(
@@ -313,26 +283,27 @@ pub fn realise_drv_remotely(drv_path: &str, host: &str) -> Result<String, NixErr
     Ok(path)
 }
 
-pub fn realise_toplevel_output_path(flake_reference: &FlakeReference) -> Result<String, NixError> {
-    let (cmd, args) = match which("nom") {
+pub fn realise_toplevel_output_paths(flake_references: &[FlakeReference]) -> Result<(), NixError> {
+    let (cmd, mut args) = match which("nom") {
         Ok(_) => ("nom", vec!["build"]),
         Err(_) => ("nix", vec!["build", "--no-link"]),
     };
 
-    let target = format!(
-        "{0}#nixosConfigurations.\"{1}\".config.system.build.toplevel",
-        flake_reference.url, flake_reference.attribute
-    );
+    // Build all targets in one command
+    let targets: Vec<String> = flake_references
+        .iter()
+        .map(|fr| {
+            format!(
+                "{}#nixosConfigurations.\"{}\".config.system.build.toplevel",
+                fr.url, fr.attribute
+            )
+        })
+        .collect();
 
-    let mut args = args;
-    args.extend(["--json", &target]);
+    args.extend(["--json"]);
+    args.extend(targets.iter().map(String::as_str));
 
-    let output = command::run_command(cmd, &args, NixError::Build)?;
-    let value = json::parse_nix_json_output(&output.stdout)?;
-
-    // sometimes the output is a list with just one item.
-    let single_value = json::extract_single_object_from_array(&value)?;
-    json::get_json_string(&single_value, &["outputs", "out"])
+    command::run_command(cmd, &args, NixError::Build).map(|_| ())
 }
 
 pub fn reboot_host(host: &str) -> Result<(), NixError> {
