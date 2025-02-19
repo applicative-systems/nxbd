@@ -265,26 +265,48 @@ fn run() -> Result<(), NxbdError> {
                 }
             }
 
-            // Do the deployment using the already fetched deploy infos
-            let results: Vec<(FlakeReference, Result<(), NixError>)> = deploy_infos
+            // Split systems into local and remote builds based on build capability
+            let (local_builds, remote_builds): (Vec<_>, Vec<_>) = deploy_infos
                 .iter()
-                .map(|(sa, info_result)| {
-                    let result =
-                        info_result
-                            .as_ref()
-                            .map_err(|e| e.clone())
-                            .and_then(|deploy_info| {
-                                deploy_remote(
-                                    sa,
-                                    &deploy_info.toplevel_out,
-                                    &deploy_info.toplevel_drv,
-                                    &deploy_info.fqdn_or_host_name,
-                                    !user_info.can_build_natively(&deploy_info.system),
-                                )
-                            });
+                .filter_map(|(system, info_result)| {
+                    info_result.as_ref().ok().map(|info| (system, info))
+                })
+                .partition(|(_, info)| user_info.can_build_natively(&info.system));
+
+            // Deploy systems that can be built locally
+            println!("\nDeploying locally-built systems:");
+            let local_results: Vec<(FlakeReference, Result<(), NixError>)> = local_builds
+                .into_iter()
+                .map(|(sa, deploy_info)| {
+                    let result = deploy_remote(
+                        sa,
+                        &deploy_info.toplevel_out,
+                        &deploy_info.toplevel_drv,
+                        &deploy_info.fqdn_or_host_name,
+                        false,
+                    );
                     (sa.clone(), result)
                 })
                 .collect();
+
+            // Deploy systems that need remote building
+            println!("\nDeploying remotely-built systems:");
+            let remote_results: Vec<(FlakeReference, Result<(), NixError>)> = remote_builds
+                .into_iter()
+                .map(|(sa, deploy_info)| {
+                    let result = deploy_remote(
+                        sa,
+                        &deploy_info.toplevel_out,
+                        &deploy_info.toplevel_drv,
+                        &deploy_info.fqdn_or_host_name,
+                        true,
+                    );
+                    (sa.clone(), result)
+                })
+                .collect();
+
+            // Combine results for summary
+            let results: Vec<_> = local_results.into_iter().chain(remote_results).collect();
 
             println!("\nDeployment Summary:");
             for (system, result) in results {
