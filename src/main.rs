@@ -397,14 +397,30 @@ fn run() -> Result<(), NxbdError> {
             println!("\nSystem Configurations:");
 
             let ignored_checks = load_ignored_checks(&ignore_file);
-            let mut all_results = Vec::new();
-            let mut had_failures = false;
 
-            for system in &system_attributes {
+            eprintln!(
+                "Reading configurations of {}...",
+                system_attributes
+                    .iter()
+                    .map(|s| format!(".#{}", s.attribute))
+                    .collect::<Vec<_>>()
+                    .join(" ")
+            );
+
+            let deploy_infos: Vec<(FlakeReference, Result<ConfigInfo, NixError>)> =
+                system_attributes
+                    .par_iter()
+                    .map(|system| (system.clone(), nixos_deploy_info(system)))
+                    .collect();
+
+            let mut had_failures = false;
+            let mut all_results = Vec::new();
+
+            for (system, info) in &deploy_infos {
                 println!("\n=== {} ===", system.to_string().cyan().bold());
-                match nixos_deploy_info(system) {
+                match info {
                     Ok(info) => {
-                        let results = run_all_checks(&info, &user_info);
+                        let results = run_all_checks(info, &user_info);
 
                         // Check for unignored failures while displaying results
                         for (group_id, _, check_results) in &results {
