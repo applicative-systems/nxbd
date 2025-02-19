@@ -92,31 +92,6 @@ fn flakerefs_or_default(refs: &[FlakeReference]) -> Result<Vec<FlakeReference>, 
     }
 }
 
-fn deploy_remote(
-    system_attribute: &FlakeReference,
-    toplevel_out: &str,
-    toplevel_drv: &str,
-    host: &str,
-    build_remote: bool,
-) -> Result<(), libnxbd::NixError> {
-    if build_remote {
-        println!("{}", format!("→ Building on remote host: {}", host).white());
-        copy_to_host(&toplevel_drv, host)?;
-        realise_drv_remotely(&toplevel_drv, host)?;
-    } else {
-        let outpath = realise_toplevel_output_path(system_attribute)?;
-        // We should change this in a way that realise_toplevel_output_path actually accepts the .drv file, but that may be impeding to nix-output-monitor
-        assert_eq!(
-            outpath, toplevel_out,
-            "Built output path does not match evaluated output path"
-        );
-        copy_to_host(&toplevel_out, host)?;
-    }
-
-    activate_profile(&toplevel_out, true, Some(host))?;
-    switch_to_configuration(&toplevel_out, "switch", true, Some(host))
-}
-
 fn run_system_checks(
     system: &FlakeReference,
     info: &ConfigInfo,
@@ -278,13 +253,29 @@ fn run() -> Result<(), NxbdError> {
             let local_results: Vec<(FlakeReference, Result<(), NixError>)> = local_builds
                 .into_iter()
                 .map(|(sa, deploy_info)| {
-                    let result = deploy_remote(
-                        sa,
-                        &deploy_info.toplevel_out,
-                        &deploy_info.toplevel_drv,
-                        &deploy_info.fqdn_or_host_name,
-                        false,
-                    );
+                    let result = realise_toplevel_output_path(sa)
+                        .and_then(|outpath| {
+                            assert_eq!(
+                                outpath, deploy_info.toplevel_out,
+                                "Built output path does not match evaluated output path"
+                            );
+                            copy_to_host(&deploy_info.toplevel_out, &deploy_info.fqdn_or_host_name)
+                        })
+                        .and_then(|_| {
+                            activate_profile(
+                                &deploy_info.toplevel_out,
+                                true,
+                                Some(&deploy_info.fqdn_or_host_name),
+                            )
+                        })
+                        .and_then(|_| {
+                            switch_to_configuration(
+                                &deploy_info.toplevel_out,
+                                "switch",
+                                true,
+                                Some(&deploy_info.fqdn_or_host_name),
+                            )
+                        });
                     (sa.clone(), result)
                 })
                 .collect();
@@ -294,13 +285,37 @@ fn run() -> Result<(), NxbdError> {
             let remote_results: Vec<(FlakeReference, Result<(), NixError>)> = remote_builds
                 .into_iter()
                 .map(|(sa, deploy_info)| {
-                    let result = deploy_remote(
-                        sa,
-                        &deploy_info.toplevel_out,
-                        &deploy_info.toplevel_drv,
-                        &deploy_info.fqdn_or_host_name,
-                        true,
+                    println!(
+                        "{}",
+                        format!(
+                            "→ Building on remote host: {}",
+                            deploy_info.fqdn_or_host_name
+                        )
+                        .white()
                     );
+                    let result =
+                        copy_to_host(&deploy_info.toplevel_drv, &deploy_info.fqdn_or_host_name)
+                            .and_then(|_| {
+                                realise_drv_remotely(
+                                    &deploy_info.toplevel_drv,
+                                    &deploy_info.fqdn_or_host_name,
+                                )
+                            })
+                            .and_then(|_| {
+                                activate_profile(
+                                    &deploy_info.toplevel_out,
+                                    true,
+                                    Some(&deploy_info.fqdn_or_host_name),
+                                )
+                            })
+                            .and_then(|_| {
+                                switch_to_configuration(
+                                    &deploy_info.toplevel_out,
+                                    "switch",
+                                    true,
+                                    Some(&deploy_info.fqdn_or_host_name),
+                                )
+                            });
                     (sa.clone(), result)
                 })
                 .collect();
