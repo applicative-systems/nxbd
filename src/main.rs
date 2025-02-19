@@ -249,7 +249,6 @@ fn run() -> Result<(), NxbdError> {
                 .partition(|(_, info)| user_info.can_build_natively(&info.system));
 
             // Deploy systems that can be built locally
-            println!("\nDeploying locally-built systems:");
             if !local_builds.is_empty() {
                 let local_systems: Vec<FlakeReference> =
                     local_builds.iter().map(|(sa, _)| (*sa).clone()).collect();
@@ -281,7 +280,6 @@ fn run() -> Result<(), NxbdError> {
                 .collect();
 
             // Deploy systems that need remote building
-            println!("\nDeploying remotely-built systems:");
             let remote_results: Vec<(FlakeReference, Result<(), NixError>)> = remote_builds
                 .into_iter()
                 .map(|(sa, deploy_info)| {
