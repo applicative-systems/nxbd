@@ -101,7 +101,6 @@ fn deploy_remote(
     if build_remote {
         println!("{}", format!("→ Building on remote host: {}", host).white());
         copy_to_host(&toplevel_drv, host)?;
-        println!("lol");
         realise_drv_remotely(&toplevel_drv, host)?;
     } else {
         let outpath = realise_toplevel_output_path(system_attribute)?;
