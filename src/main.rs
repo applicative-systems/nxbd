@@ -329,7 +329,9 @@ fn run() -> Result<(), NxbdError> {
                             .iter()
                             .find(|(s, _)| s == &system)
                             .and_then(|(_, i)| i.as_ref().ok())
-                            .and_then(|info| check_system_status(&info.fqdn_or_host_name).ok())
+                            .and_then(|info| {
+                                check_system_status(Some(&info.fqdn_or_host_name)).ok()
+                            })
                             .map_or(("", false), |sys_status| match sys_status {
                                 SystemStatus::Reachable { needs_reboot, .. } => (
                                     if needs_reboot {
@@ -415,7 +417,7 @@ fn run() -> Result<(), NxbdError> {
             activate_profile(&toplevel, true, None)?;
             switch_to_configuration(&toplevel, "switch", true, None)?;
 
-            match check_system_status(&local_hostname)? {
+            match check_system_status(None)? {
                 SystemStatus::Reachable { needs_reboot, .. } => {
                     if needs_reboot {
                         println!("System update complete. Reboot required.");
@@ -658,7 +660,13 @@ fn run() -> Result<(), NxbdError> {
                         .map(|info| (system.clone(), info))
                 })
                 .par_bridge()
-                .map(|(system, info)| (system, info, check_system_status(&info.fqdn_or_host_name)))
+                .map(|(system, info)| {
+                    (
+                        system,
+                        info,
+                        check_system_status(Some(&info.fqdn_or_host_name)),
+                    )
+                })
                 .collect();
 
             // Finally, print all results

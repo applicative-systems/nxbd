@@ -338,7 +338,7 @@ pub enum SystemStatus {
     },
 }
 
-pub fn check_system_status(host: &str) -> Result<SystemStatus, NixError> {
+pub fn check_system_status(host: Option<&str>) -> Result<SystemStatus, NixError> {
     let status_script = r#"
         set -euo pipefail
 
@@ -362,7 +362,7 @@ pub fn check_system_status(host: &str) -> Result<SystemStatus, NixError> {
         echo "$needs_reboot"
     "#;
 
-    let output = run_remote_script(host, status_script)?;
+    let output = run_script(status_script, host)?;
 
     if !output.status.success() {
         return Ok(SystemStatus::Unreachable);
@@ -405,29 +405,33 @@ pub fn check_system_status(host: &str) -> Result<SystemStatus, NixError> {
     })
 }
 
-// This function pipes the script via stdin to avoid bash quoting madness
-pub fn run_remote_script(host: &str, script: &str) -> Result<process::Output, NixError> {
-    let mut cmd = std::process::Command::new("ssh");
-    cmd.arg(host)
-        .arg("bash")
-        .stdin(std::process::Stdio::piped())
-        .stdout(std::process::Stdio::piped())
-        .stderr(std::process::Stdio::inherit());
+pub fn run_script(script: &str, host: Option<&str>) -> Result<process::Output, NixError> {
+    match host {
+        Some(h) => {
+            let mut cmd = std::process::Command::new("ssh");
+            cmd.arg(h)
+                .arg("bash")
+                .stdin(std::process::Stdio::piped())
+                .stdout(std::process::Stdio::piped())
+                .stderr(std::process::Stdio::inherit());
 
-    let mut child = cmd
-        .spawn()
-        .map_err(|_| NixError::Eval("Failed to spawn SSH".to_string()))?;
+            let mut child = cmd
+                .spawn()
+                .map_err(|_| NixError::Eval("Failed to spawn SSH".to_string()))?;
 
-    if let Some(mut stdin) = child.stdin.take() {
-        use std::io::Write;
-        stdin
-            .write_all(script.as_bytes())
-            .map_err(|_| NixError::Eval("Failed to write to SSH stdin".to_string()))?;
+            if let Some(mut stdin) = child.stdin.take() {
+                use std::io::Write;
+                stdin
+                    .write_all(script.as_bytes())
+                    .map_err(|_| NixError::Eval("Failed to write to SSH stdin".to_string()))?;
+            }
+
+            child
+                .wait_with_output()
+                .map_err(|_| NixError::Eval("Failed to get SSH output".to_string()))
+        }
+        None => command::run_command("bash", &["-c", script], NixError::Build),
     }
-
-    child
-        .wait_with_output()
-        .map_err(|_| NixError::Eval("Failed to get SSH output".to_string()))
 }
 
 #[cfg(test)]
