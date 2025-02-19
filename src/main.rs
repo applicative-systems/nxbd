@@ -214,21 +214,32 @@ fn run() -> Result<(), NxbdError> {
             reboot,
         } => {
             let system_attributes = flakerefs_or_default(systems)?;
-            println!(
-                "Switching systems: {}",
+
+            eprintln!(
+                "Reading configurations of {}...",
                 system_attributes
                     .iter()
-                    .map(|f| f.to_string())
-                    .collect::<Vec<String>>()
+                    .map(|s| format!(".#{}", s.attribute))
+                    .collect::<Vec<_>>()
                     .join(" ")
             );
 
-            // Get all deploy infos first
+            // Parallelize deploy info collection
             let deploy_infos: Vec<(FlakeReference, Result<ConfigInfo, NixError>)> =
                 system_attributes
-                    .iter()
-                    .map(|sa| (sa.clone(), nixos_deploy_info(sa)))
+                    .par_iter()
+                    .map(|system| (system.clone(), nixos_deploy_info(system)))
                     .collect();
+
+            println!(
+                "Switching systems: {}",
+                deploy_infos
+                    .iter()
+                    .filter_map(|(_, info)| info.as_ref().ok())
+                    .map(|info| info.fqdn_or_host_name.as_str())
+                    .collect::<Vec<_>>()
+                    .join(" ")
+            );
 
             // Run checks first (unless ignored)
             if !ignore_checks {
