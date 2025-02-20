@@ -99,6 +99,9 @@ pub enum Command {
     },
 
     #[command(about = "List all available configuration checks")]
+    #[command(
+        long_about = "List all available configuration checks along with all their descriptions."
+    )]
     Checks,
 
     #[command(about = "Show status of NixOS systems")]
