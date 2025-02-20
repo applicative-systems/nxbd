@@ -70,11 +70,11 @@
             ];
           };
 
-          documentation.mkdocs-root = pkgs.runCommand "documentation-root" {} ''
+          documentation.mkdocs-root = pkgs.runCommand "documentation-root" { } ''
             mkdir $out
             cp -r ${./documentation}/* "$out"
             chmod -R 777 "$out"/*
-            ${pkgs.nxbd}/bin/nxbd generate-docs "$out/docs/checks"
+            ${pkgs.nxbd}/bin/nxbd generate-docs "$out/docs"
           '';
 
           formatter = treefmtEval.config.build.wrapper;

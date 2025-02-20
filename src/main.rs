@@ -2,7 +2,7 @@ mod cli;
 mod libnxbd;
 
 use crate::cli::{Cli, Command};
-use clap::Parser;
+use clap::{CommandFactory, Parser};
 use libnxbd::{
     configcheck::{
         get_standard_checks, load_ignored_checks, run_all_checks,
@@ -143,10 +143,89 @@ fn run() -> Result<(), NxbdError> {
 
     match &cli.command {
         Command::GenerateDocs { output_dir } => {
-            create_dir_all(&output_dir)?;
+            let app = Cli::command();
 
+            create_dir_all(format!("{}/commands", output_dir))?;
+            create_dir_all(format!("{}/checks", output_dir))?;
+
+            {
+                // CLI command overview for index.md
+                let mut cli_content = String::new();
+                cli_content.push_str("# `nxbd` CLI Commands\n\n");
+                cli_content.push_str(
+                    "This section describes all available commands in the `nxbd` tool.\n\n",
+                );
+
+                cli_content.push_str("## Available Commands\n\n");
+
+                for subcmd in app.get_subcommands() {
+                    if subcmd.is_hide_set() {
+                        continue;
+                    }
+
+                    cli_content.push_str(&format!("## `nxbd {}`\n\n", subcmd.get_name()));
+
+                    if let Some(long_about) = subcmd.get_long_about() {
+                        cli_content.push_str(&format!("{}\n\n", long_about.to_string()));
+                    }
+                }
+
+                cli_content.push_str("## Global Options\n\n");
+                cli_content
+                    .push_str("- `--verbose`: Show detailed information during execution\n\n");
+
+                fs::write(format!("{}/commands/index.md", output_dir), cli_content)?;
+            }
+
+            // Generate documentation for each command on an individual page
+            for subcmd in app.get_subcommands() {
+                let mut content = String::new();
+
+                if subcmd.is_hide_set() {
+                    continue;
+                }
+
+                content.push_str(&format!("# `nxbd {}`\n\n", subcmd.get_name()));
+
+                if let Some(long_about) = subcmd.get_long_about() {
+                    content.push_str(&format!("{}\n\n", long_about.to_string()));
+                }
+
+                let mut has_args = false;
+                for arg in subcmd.get_arguments() {
+                    if !has_args {
+                        content.push_str("## Arguments\n");
+                        has_args = true;
+                    }
+
+                    let arg_name = arg.get_id().as_str();
+                    let help = arg
+                        .get_help()
+                        .map(|h| h.to_string())
+                        .unwrap_or_else(|| "No description available".to_string());
+                    let prefix = if arg.is_positional() { "" } else { "--" };
+                    content.push_str(&format!(
+                        "### `{}{}`{}\n\n{}\n\n",
+                        prefix,
+                        arg_name,
+                        if arg.is_required_set() {
+                            ""
+                        } else {
+                            " (optional)"
+                        },
+                        help
+                    ));
+                }
+
+                fs::write(
+                    format!("{}/commands/{}.md", output_dir, subcmd.get_name()),
+                    content,
+                )?;
+            }
+
+            // Generate check documentation (existing code)
             for group in get_standard_checks() {
-                let filename = format!("{}/{}.md", output_dir, group.id);
+                let filename = format!("{}/checks/{}.md", output_dir, group.id);
                 let mut content = String::new();
 
                 // Add header
@@ -681,7 +760,7 @@ fn run() -> Result<(), NxbdError> {
                 });
             }
         }
-        
+
         Command::Status { systems } => {
             let system_attributes = flakerefs_or_default(systems)?;
 
@@ -787,9 +866,8 @@ fn run() -> Result<(), NxbdError> {
                 }
             }
         }
-        Command::Checks => {}        
-        Command::GenerateDocs { output_dir: _ } => {
-        }        
+        Command::Checks => {}
+        Command::GenerateDocs { output_dir: _ } => {}
     }
     Ok(())
 }
