@@ -88,7 +88,7 @@ nix profile install github:applicative-systems/nxbd
 
 ## Documentation
 
-Visit our [documentation site](https://applicative-systems.github.io/nxbd/) for:
+Visit our [documentation site](https://applicative.systems/nxbd/) for:
 
 - Detailed command reference
 - Configuration check explanations
