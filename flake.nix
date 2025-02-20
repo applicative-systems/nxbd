@@ -37,7 +37,9 @@
             projectRootFile = "flake.nix";
             programs = {
               deadnix.enable = true;
-              mdformat.enable = true;
+              # disabled for now because mkdocs wants 4 spaces indent for
+              # multi level bullet point lists, but mdformat doesn't allow it.
+              mdformat.enable = false;
               nixfmt.enable = true;
               rustfmt.enable = true;
               shfmt.enable = true;
