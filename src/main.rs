@@ -140,6 +140,72 @@ fn main() {
 
 fn run() -> Result<(), NxbdError> {
     let cli = Cli::parse();
+
+    match &cli.command {
+        Command::GenerateDocs { output_dir } => {
+            create_dir_all(&output_dir)?;
+
+            for group in get_standard_checks() {
+                let filename = format!("{}/{}.md", output_dir, group.id);
+                let mut content = String::new();
+
+                // Add header
+                content.push_str(&format!("# {}\n\n", group.name));
+                content.push_str(&format!("{}\n\n", group.description));
+
+                // Add table of contents
+                content.push_str("## Checks\n\n");
+                for check in &group.checks {
+                    content.push_str(&format!(
+                        "- [{} - {}](#{})\n",
+                        check.id, check.description, check.id
+                    ));
+                }
+                content.push('\n');
+
+                // Add detailed check information
+                content.push_str("## Details\n\n");
+                for check in &group.checks {
+                    content.push_str(&format!(
+                        "### {}<a name=\"{}\"></a>\n\n",
+                        check.id, check.id
+                    ));
+                    content.push_str("**Description:**\n");
+                    content.push_str(&format!("{}\n\n", check.description));
+                    content.push_str("**How to fix:**\n");
+                    content.push_str(&format!("{}\n\n", check.advice));
+                }
+
+                fs::write(filename, content)?;
+            }
+
+            eprintln!("Documentation generated in {}", output_dir);
+            return Ok(());
+        }
+        Command::Checks => {
+            println!("Available configuration checks:\n");
+            for group in get_standard_checks() {
+                println!(
+                    "\n{} - {}\n{}\n",
+                    group.id.cyan().bold(),
+                    group.name.bold(),
+                    group.description.dimmed()
+                );
+
+                for check in group.checks {
+                    println!(
+                        "  {} - {}\n    {}\n",
+                        check.id.yellow(),
+                        check.description,
+                        check.advice.dimmed()
+                    );
+                }
+            }
+            return Ok(());
+        }
+        _ => {}
+    }
+
     let user_info = UserInfo::collect()?;
 
     if cli.verbose {
@@ -615,26 +681,7 @@ fn run() -> Result<(), NxbdError> {
                 });
             }
         }
-        Command::Checks => {
-            println!("Available configuration checks:\n");
-            for group in get_standard_checks() {
-                println!(
-                    "\n{} - {}\n{}\n",
-                    group.id.cyan().bold(),
-                    group.name.bold(),
-                    group.description.dimmed()
-                );
-
-                for check in group.checks {
-                    println!(
-                        "  {} - {}\n    {}\n",
-                        check.id.yellow(),
-                        check.description,
-                        check.advice.dimmed()
-                    );
-                }
-            }
-        }
+        
         Command::Status { systems } => {
             let system_attributes = flakerefs_or_default(systems)?;
 
@@ -740,45 +787,9 @@ fn run() -> Result<(), NxbdError> {
                 }
             }
         }
-        Command::GenerateDocs { output_dir } => {
-            create_dir_all(&output_dir)?;
-
-            for group in get_standard_checks() {
-                let filename = format!("{}/{}.md", output_dir, group.id);
-                let mut content = String::new();
-
-                // Add header
-                content.push_str(&format!("# {}\n\n", group.name));
-                content.push_str(&format!("{}\n\n", group.description));
-
-                // Add table of contents
-                content.push_str("## Checks\n\n");
-                for check in &group.checks {
-                    content.push_str(&format!(
-                        "- [{} - {}](#{})\n",
-                        check.id, check.description, check.id
-                    ));
-                }
-                content.push('\n');
-
-                // Add detailed check information
-                content.push_str("## Details\n\n");
-                for check in &group.checks {
-                    content.push_str(&format!(
-                        "### {}<a name=\"{}\"></a>\n\n",
-                        check.id, check.id
-                    ));
-                    content.push_str("**Description:**\n");
-                    content.push_str(&format!("{}\n\n", check.description));
-                    content.push_str("**How to fix:**\n");
-                    content.push_str(&format!("{}\n\n", check.advice));
-                }
-
-                fs::write(filename, content)?;
-            }
-
-            eprintln!("Documentation generated in {}", output_dir);
-        }
+        Command::Checks => {}        
+        Command::GenerateDocs { output_dir: _ } => {
+        }        
     }
     Ok(())
 }

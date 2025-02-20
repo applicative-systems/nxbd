@@ -5,6 +5,8 @@
     flake-parts.url = "github:hercules-ci/flake-parts";
     flake-parts.inputs.nixpkgs-lib.follows = "nixpkgs";
 
+    mkdocs-flake.url = "github:applicative-systems/mkdocs-flake";
+
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
 
     treefmt-nix.url = "github:numtide/treefmt-nix";
@@ -18,6 +20,9 @@
         "aarch64-linux"
         "aarch64-darwin"
         "x86_64-darwin"
+      ];
+      imports = [
+        inputs.mkdocs-flake.flakeModules.default
       ];
       perSystem =
         {
@@ -64,6 +69,13 @@
               treefmtEval.config.build.wrapper
             ];
           };
+
+          documentation.mkdocs-root = pkgs.runCommand "documentation-root" {} ''
+            mkdir $out
+            cp -r ${./documentation}/* "$out"
+            chmod -R 777 "$out"/*
+            ${pkgs.nxbd}/bin/nxbd generate-docs "$out/docs/checks"
+          '';
 
           formatter = treefmtEval.config.build.wrapper;
 
