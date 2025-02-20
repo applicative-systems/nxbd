@@ -2,7 +2,7 @@ site_name: nxbd NixOS Build & Deployment Tool Documentation
 site_url: https://applicative.systems/nxbd
 repo_url: https://github.com/applicative-systems/nxbd
 repo_name: applicative-systems/nxbd
-edit_uri: edit/main/docs
+edit_uri: edit/main/documentation/docs
 site_author: Jacek Galowicz
 copyright: Copyright &copy; 2025 Applicative Systems GmbH
 
