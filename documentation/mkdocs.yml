@@ -14,7 +14,8 @@ plugins:
 
 
 theme:
-  font: false
+  font:
+    text: Raleway
   language: en
   name: material
   icon:

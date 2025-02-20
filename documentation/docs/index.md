@@ -1,72 +1,73 @@
 # The `nxbd` Tool
 
-The integrated NixOS Build, Config Check, and Deploy Tool.
+The smart NixOS Configuration Check, Build, and Deploy Tool
+
+**Developed and maintained by [Applicative Systems](https://applicative.systems/) and [Nixcademy](https://nixcademy.com/)**
+
+## What is nxbd?
+
+`nxbd` is a lightweight, safety-focused NixOS deployment tool that helps you manage multiple NixOS systems with confidence. Unlike other deployment tools, `nxbd` focuses on validating your configurations before deployment to prevent common pitfalls and system lockouts.
 
 ## Use Cases
 
-`nxbd` is built for users who:
+`nxbd` is perfect for teams and individuals who:
 
 - Need to deploy their local or (multiple) remote systems
-    - also from macOS to NixOS machines
-      (requires [Linux Builder](https://nixcademy.com/posts/linux-builder))
-    - without having to assemble all the `nixos-rebuild` arguments manually
-- Want to check configurations for basic sanity before deploying potentially
-  broken or insecure configurations.
-- Want a simple command to check if a server configuration is already up to date
-    - or if it is up to date, but still needs a reboot
-    - and if all systemd services are OK
-- Don't want to learn how to use one of the many famous deployment tools that
-  require them to add more configuration to the repository than just the
-  `flake.nix` with the NixOS configurations.
+    - Deploy from macOS to NixOS machines (via [Linux Builder](https://nixcademy.com/posts/macos-linux-builder/))
+    - Deploy without complex `nixos-rebuild` arguments
+- Want to prevent system lockouts and configuration errors before they happen
+- Need to monitor server configurations and system health
+- Want a simple, standards-compliant tool without extra configuration overhead
 
-## Features and Design
+## Key Features
 
-- `nxbd` works on *vanilla system flakes* that enumerate one or multiple NixOS
-  configurations in the `nixosConfigurations` flake output category.
-    - This is in contrast to other famous deployment tools which require
-      additional configuration files next to your NixOS configurations.
-- It uses the same commands for evaluating, building, and deploying that
-  `nixos-rebuild` does, but discovers all necessary information from the NixOS
-  configurations themselves.
-- In contrast to `nixos-rebuild`, you don't need to provide:
-    - `--target-host <hostname>`
-    - `--fast` if you are deploying to NixOS machines from maOS
-    - `--use-remote-sudo`
-    - `--use-substitutes`
-- `nxbd` automatically attempts to build configurations on the target host that
-  it cannot build locally or on configured distributed builders.
-- `nxbd` assumes that you want to deploy with your local user account via SSH
-  and checks if the NixOS system is configured in a way that you are not locked
-  out after the deployment.
-- `nxbd` runs a [whole list of known best practise checks](checks/index.md) on
-  the NixOS configurations and aborts the deployment if it encounters any failed
-  checks.
-- All checks can be ignored.
+- **Zero Configuration**: Works with vanilla system flakes - no additional configuration files needed
+- **Smart Deployment**: Automatically handles all the complexities that `nixos-rebuild` requires manual configuration for
+- **Safety First**: Comprehensive pre-deployment checks for:
+    - SSH access and key configuration
+    - Sudo and wheel group permissions
+    - Boot loader and disk space management
+    - Service configurations and security settings
+- **Intelligent Building**: Automatically builds on target hosts when local building isn't possible
+- **System Health Monitoring**: Easy status checks for updates, reboots, and service health
 
-## Example Usage
-
-Check, build, and deploy all remote systems that are defined in the `flake.nix`
-file in the current working directory:
+## Quick Start
 
 ```console
 # Run all the checks
 $ nxbd check
 
-# Fix all failed checks.
-# If you want to ignore some of the checks, run:
+# Fix or ignore failed checks
 $ nxbd check --save-ignore
 
-# Build and deploy (allow reboots if necessary with --reboot)
+# Deploy with automatic reboots if needed
 $ nxbd switch-remote --reboot
 
-# Check system status
+# Monitor system status
 $ nxbd status
 ```
 
-`nxbd` assumes that the target hosts are reachable via SSH via the host address
-that is defined by the configuration field `networking.fqdnOrHostName`
-(which is defined by `networking.hostName` and the optional `networking.fqdn`
-fields).
+## Documentation
 
-Please have a look at the [Command reference](commands/index.md) for more
-information about the individual commands and their flags.
+- [Command Reference](commands/index.md)
+- [Configuration Checks](checks/index.md)
+- [Installation Guide](commands/installation.md)
+
+## Professional Support
+
+Need help integrating `nxbd` into your infrastructure?
+
+- **Custom Development**: Tailored features for your specific needs
+- **Integration Support**: Help with your deployment workflows
+- **Training**: Expert guidance for your team
+
+Contact us:
+
+- Email: [hello@applicative.systems](mailto:hello@applicative.systems)
+- Schedule a meeting: [nixcademy.com/meet](https://nixcademy.com/meet)
+
+## Community
+
+Join our community:
+- Matrix: [#applicative.systems:matrix.org](https://matrix.to/#/#applicative.systems:matrix.org)
+- GitHub: [applicative-systems/nxbd](https://github.com/applicative-systems/nxbd)
