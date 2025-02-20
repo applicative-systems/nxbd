@@ -18,6 +18,7 @@ theme:
     text: Raleway
   language: en
   name: material
+  logo: assets/applicative-systems-square.png
   icon:
     repo: fontawesome/brands/github
 
@@ -53,7 +54,8 @@ theme:
     # Palette toggle for automatic mode
     - media: "(prefers-color-scheme)"
       primary: black
-      accent: blue
+      primary: blue
+      accent: light blue
       toggle:
         icon: material/brightness-auto
         name: Switch to light mode
@@ -61,7 +63,8 @@ theme:
     # Palette toggle for light mode
     - media: "(prefers-color-scheme: light)"
       primary: black
-      accent: blue
+      primary: blue
+      accent: light blue
       toggle:
         icon: material/weather-sunny
         name: Switch to dark mode
@@ -69,15 +72,23 @@ theme:
     # Palette toggle for dark mode
     - media: "(prefers-color-scheme: dark)"
       primary: grey
-      accent: blue
+      primary: blue
+      accent: light blue
       scheme: slate
       toggle:
         icon: material/weather-night
         name: Switch to system preference
-
-
   icon:
     logo: logo
+
+extra:
+  social:
+    - icon: fontawesome/brands/x-twitter
+      link: https://x.com/nixcademy
+    - icon: fontawesome/brands/linkedin
+      link: https://www.linkedin.com/company/nixcademy
+    - icon: fontawesome/brands/github
+      link: https://github.com/applicative-systems/
 
 markdown_extensions:
   - abbr

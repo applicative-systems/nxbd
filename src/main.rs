@@ -729,6 +729,9 @@ fn run() -> Result<(), NxbdError> {
                     eprintln!();
 
                     for check_result in &group_result.checks {
+                        if !cli.verbose && check_result.passed {
+                            continue;
+                        }
                         eprintln!(
                             "  {} {} - {}",
                             passed_ignore_symbol(check_result.passed, check_result.ignored),
