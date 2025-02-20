@@ -204,10 +204,25 @@ fn run() -> Result<(), NxbdError> {
                         .map(|h| h.to_string())
                         .unwrap_or_else(|| "No description available".to_string());
                     let prefix = if arg.is_positional() { "" } else { "--" };
+                    let value_hint = if !arg.is_positional()
+                        && !arg.get_value_parser().possible_values().is_some()
+                    {
+                        let default_value = arg
+                            .get_default_values()
+                            .first()
+                            .and_then(|v| v.to_str())
+                            .map(|v| format!(" [default: {}]", v))
+                            .unwrap_or_else(|| String::new());
+                        format!(" <{}>{}", arg_name.to_lowercase(), default_value)
+                    } else {
+                        "".to_string()
+                    };
+
                     content.push_str(&format!(
-                        "### `{}{}`{}\n\n{}\n\n",
+                        "### `{}{}{}`{}\n\n{}\n\n",
                         prefix,
                         arg_name,
+                        value_hint,
                         if arg.is_required_set() {
                             ""
                         } else {
