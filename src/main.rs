@@ -5,8 +5,8 @@ use crate::cli::{Cli, Command};
 use clap::Parser;
 use libnxbd::{
     configcheck::{
-        get_standard_checks, is_check_ignored, load_ignored_checks, run_all_checks,
-        save_failed_checks_to_ignore_file,
+        get_standard_checks, load_ignored_checks, run_all_checks,
+        save_failed_checks_to_ignore_file, CheckGroupResult,
     },
     nixcommands::{
         activate_profile, check_system_status, copy_to_host, nixos_configuration_flakerefs,
@@ -78,9 +78,17 @@ impl From<NixError> for NxbdError {
 
 fn passed_symbol(passed: bool) -> String {
     if passed {
-        "✓".green().to_string()
+        "✅".green().to_string()
     } else {
-        "✗".red().to_string()
+        "❌".red().to_string()
+    }
+}
+
+fn passed_ignore_symbol(passed: bool, ignored: bool) -> String {
+    if !passed && ignored {
+        "🙈".to_string()
+    } else {
+        passed_symbol(passed)
     }
 }
 
@@ -99,18 +107,13 @@ fn run_system_checks(
     ignore_file: &str,
 ) -> Result<Vec<(String, String)>, NixError> {
     let ignored_checks = load_ignored_checks(ignore_file);
-    let results = run_all_checks(info, user_info);
+    let results = run_all_checks(info, user_info, ignored_checks.as_ref(), system);
     let mut failures = Vec::new();
 
-    for (group_id, _, check_results) in &results {
-        for (check_id, passed) in check_results {
-            if !passed
-                && !ignored_checks
-                    .as_ref()
-                    .map(|ic| is_check_ignored(ic, &system, group_id, check_id))
-                    .unwrap_or(false)
-            {
-                failures.push((group_id.clone(), check_id.clone()));
+    for group in &results {
+        for check in &group.checks {
+            if !check.passed && !check.ignored {
+                failures.push((group.id.clone(), check.id.clone()));
             }
         }
     }
@@ -436,8 +439,6 @@ fn run() -> Result<(), NxbdError> {
             ignore_file,
         } => {
             let system_attributes = flakerefs_or_default(systems)?;
-            println!("\nSystem Configurations:");
-
             let ignored_checks = load_ignored_checks(&ignore_file);
 
             eprintln!(
@@ -455,106 +456,120 @@ fn run() -> Result<(), NxbdError> {
                     .map(|system| (system.clone(), nixos_deploy_info(system)))
                     .collect();
 
-            let mut had_failures = false;
-            let mut all_results = Vec::new();
+            // Check if any deploy infos failed to evaluate
+            let failed_systems: Vec<_> = deploy_infos
+                .iter()
+                .filter_map(|(system, result)| result.as_ref().err().map(|e| (system, e)))
+                .collect();
 
-            for (system, info) in &deploy_infos {
-                println!("\n=== {} ===", system.to_string().cyan().bold());
-                match info {
-                    Ok(info) => {
-                        let results = run_all_checks(info, &user_info);
+            if !failed_systems.is_empty() {
+                eprintln!("\nFailed to evaluate the following systems:");
+                for (system, error) in &failed_systems {
+                    eprintln!("  {} - {}", system, error);
+                }
+                let first_error = failed_systems[0].1.clone();
+                return Err(NixError::from(first_error).into());
+            }
 
-                        // Check for unignored failures while displaying results
-                        for (group_id, _, check_results) in &results {
-                            for (check_id, passed) in check_results {
-                                if !passed
-                                    && !ignored_checks
-                                        .as_ref()
-                                        .map(|ic| is_check_ignored(ic, system, group_id, check_id))
-                                        .unwrap_or(false)
-                                {
-                                    had_failures = true;
-                                }
-                            }
-                        }
+            let all_results: Vec<(&FlakeReference, Vec<CheckGroupResult>)> = deploy_infos
+                .iter()
+                .filter_map(|(system, info)| {
+                    info.as_ref().ok().map(|i| {
+                        (
+                            system,
+                            run_all_checks(i, &user_info, ignored_checks.as_ref(), system),
+                        )
+                    })
+                })
+                .collect();
 
-                        let results_for_display = results.clone();
+            for (system, check_group_results) in &all_results {
+                eprintln!("\n=== {} ===", system.to_string().cyan().bold());
 
-                        for (group_id, _, check_results) in results_for_display {
-                            if let Some(group) =
-                                get_standard_checks().into_iter().find(|g| g.id == group_id)
-                            {
-                                // First, separate passed and failed checks
-                                let (passed_checks, failed_checks): (Vec<_>, Vec<_>) =
-                                    check_results.into_iter().partition(|(_, passed)| *passed);
+                let all_passed_or_ignored = check_group_results.iter().all(|group| {
+                    group
+                        .checks
+                        .iter()
+                        .all(|check| check.passed || check.ignored)
+                });
 
-                                // Filter failed checks to remove ignored ones
-                                let unignored_failures: Vec<_> = failed_checks
-                                    .into_iter()
-                                    .filter(|(check_id, _)| {
-                                        !ignored_checks
-                                            .as_ref()
-                                            .map(|ic| {
-                                                is_check_ignored(ic, system, &group_id, check_id)
-                                            })
-                                            .unwrap_or(false)
-                                    })
-                                    .collect();
+                if all_passed_or_ignored {
+                    let total_checks: usize =
+                        check_group_results.iter().map(|g| g.checks.len()).sum();
+                    let total_ignored: usize = check_group_results
+                        .iter()
+                        .map(|g| g.checks.iter().filter(|c| c.ignored).count())
+                        .sum();
 
-                                // Only show group if there are any non-ignored checks
-                                let non_ignored_count =
-                                    passed_checks.len() + unignored_failures.len();
-                                if non_ignored_count > 0 {
-                                    // Group passes if there are no unignored failures
-                                    let effective_group_passed = unignored_failures.is_empty();
+                    eprintln!(
+                        "{} {} checks passed ({} ignored fails)",
+                        passed_symbol(true),
+                        total_checks,
+                        total_ignored
+                    );
 
-                                    println!(
-                                        "{} - {}: {} {}\n{}\n",
-                                        group.id.cyan().bold(),
-                                        group.name.bold(),
-                                        passed_symbol(effective_group_passed),
-                                        format!("({}/{})", passed_checks.len(), non_ignored_count)
-                                            .dimmed(),
-                                        group.description.dimmed()
-                                    );
-
-                                    // Show all passed checks
-                                    for (check_id, _) in passed_checks {
-                                        println!("  {}: {}", check_id, passed_symbol(true));
-                                    }
-
-                                    // Show unignored failed checks
-                                    for (check_id, check_passed) in unignored_failures {
-                                        println!("  {}: {}", check_id, passed_symbol(check_passed));
-                                        if cli.verbose {
-                                            if let Some(check) =
-                                                group.checks.iter().find(|c| c.id == check_id)
-                                            {
-                                                println!(
-                                                    "    - {}\n      {}\n",
-                                                    check.description,
-                                                    check.advice.dimmed()
-                                                );
-                                            }
-                                        }
-                                    }
-                                }
-                                println!();
-                            }
-                        }
-                        all_results.push((system, results));
+                    if !cli.verbose {
+                        continue;
                     }
-                    Err(e) => {
-                        had_failures = true;
-                        match e {
-                            NixError::Eval(msg) => {
-                                println!("Error evaluating system info:\n{}", msg)
-                            }
-                            _ => println!("Error getting system info: {:?}", e),
+                }
+
+                for group_result in check_group_results {
+                    let no_unignored_failures = group_result
+                        .checks
+                        .iter()
+                        .all(|check| check.passed || check.ignored);
+
+                    if no_unignored_failures && !cli.verbose {
+                        continue;
+                    }
+
+                    let checks_count = group_result.checks.len();
+                    let passed_count = group_result
+                        .checks
+                        .iter()
+                        .filter(|check| check.passed)
+                        .count();
+                    let ignored_count = group_result
+                        .checks
+                        .iter()
+                        .filter(|check| check.ignored)
+                        .count();
+
+                    eprintln!(
+                        "\n{} - {} ({} checks, {} passed, {} ignored)",
+                        group_result.id.cyan().bold(),
+                        group_result.name.bold(),
+                        checks_count,
+                        passed_count,
+                        ignored_count
+                    );
+                    eprintln!("{}", group_result.description);
+                    eprintln!();
+
+                    for check_result in &group_result.checks {
+                        eprintln!(
+                            "  {} {} - {}",
+                            passed_ignore_symbol(check_result.passed, check_result.ignored),
+                            check_result.id.yellow(),
+                            check_result.description
+                        );
+                        if !check_result.passed {
+                            eprintln!("    - {}", check_result.advice.dimmed());
                         }
                     }
                 }
             }
+
+            println!();
+
+            let had_failures = all_results.iter().any(|(_, results)| {
+                results.iter().any(|group| {
+                    group
+                        .checks
+                        .iter()
+                        .any(|check| !check.passed && !check.ignored)
+                })
+            });
 
             if *save_ignore {
                 if let Err(e) = save_failed_checks_to_ignore_file(&ignore_file, &all_results) {
@@ -568,21 +583,12 @@ fn run() -> Result<(), NxbdError> {
                     .filter_map(|(system, results)| {
                         let failures: Vec<(String, String)> = results
                             .iter()
-                            .flat_map(|(group_id, _, check_results)| {
-                                check_results
+                            .flat_map(|group| {
+                                group
+                                    .checks
                                     .iter()
-                                    .filter(|(check_id, passed)| {
-                                        !passed
-                                            && !ignored_checks
-                                                .as_ref()
-                                                .map(|ic| {
-                                                    is_check_ignored(
-                                                        ic, &system, group_id, check_id,
-                                                    )
-                                                })
-                                                .unwrap_or(false)
-                                    })
-                                    .map(|(check_id, _)| (group_id.clone(), check_id.clone()))
+                                    .filter(|check| !check.passed && !check.ignored)
+                                    .map(|check| (group.id.clone(), check.id.clone()))
                             })
                             .collect();
                         if !failures.is_empty() {

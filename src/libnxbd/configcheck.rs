@@ -49,32 +49,60 @@ pub struct CheckGroup {
     pub checks: Vec<Check>,
 }
 
-impl CheckGroup {
-    pub fn run_checks(
-        &self,
-        config: &ConfigInfo,
-        user_info: &UserInfo,
-    ) -> (bool, Vec<(String, bool)>) {
-        let check_results: Vec<(String, bool)> = self
-            .checks
-            .iter()
-            .map(|check| (check.id.clone(), check.check(config, user_info).is_ok()))
-            .collect();
+#[derive(Debug, Clone)]
+pub struct CheckResult {
+    pub id: String,
+    pub description: String,
+    pub advice: String,
+    pub passed: bool,
+    pub ignored: bool,
+}
 
-        let group_passed = check_results.iter().all(|(_, passed)| *passed);
-        (group_passed.clone(), check_results)
-    }
+#[derive(Debug, Clone)]
+pub struct CheckGroupResult {
+    pub id: String,
+    pub name: String,
+    pub description: String,
+    pub checks: Vec<CheckResult>,
 }
 
 pub fn run_all_checks(
     config: &ConfigInfo,
     user_info: &UserInfo,
-) -> Vec<(String, bool, Vec<(String, bool)>)> {
+    ignored_checks: Option<&HashMap<String, HashMap<String, Vec<String>>>>,
+    system: &FlakeReference,
+) -> Vec<CheckGroupResult> {
     get_standard_checks()
         .iter()
         .map(|group| {
-            let (group_passed, check_results) = group.run_checks(config, user_info);
-            (group.id.clone(), group_passed.clone(), check_results)
+            let check_results: Vec<CheckResult> = group
+                .checks
+                .iter()
+                .map(|check| {
+                    let passed = check.check(config, user_info).is_ok();
+                    let ignored = !passed
+                        && ignored_checks
+                            .and_then(|ic| ic.get(&system.to_string()))
+                            .and_then(|system_map| system_map.get(&group.id))
+                            .map(|checks| checks.contains(&check.id))
+                            .unwrap_or(false);
+
+                    CheckResult {
+                        id: check.id.clone(),
+                        description: check.description.clone(),
+                        advice: check.advice.clone(),
+                        passed,
+                        ignored,
+                    }
+                })
+                .collect();
+
+            CheckGroupResult {
+                id: group.id.clone(),
+                name: group.name.clone(),
+                description: group.description.clone(),
+                checks: check_results,
+            }
         })
         .collect()
 }
@@ -701,7 +729,7 @@ impl From<serde_yaml::Error> for CheckFileError {
 
 pub fn save_failed_checks_to_ignore_file(
     path: &str,
-    system_results: &[(&FlakeReference, Vec<(String, bool, Vec<(String, bool)>)>)],
+    system_results: &[(&FlakeReference, Vec<CheckGroupResult>)],
 ) -> Result<(), CheckFileError> {
     // Start with existing ignored checks if available
     let mut ignore_map = load_ignored_checks(path).unwrap_or_else(|| HashMap::new());
@@ -710,15 +738,16 @@ pub fn save_failed_checks_to_ignore_file(
     for (system, results) in system_results {
         let mut system_map: HashMap<String, Vec<String>> = HashMap::new();
 
-        for (group_id, _group_passed, check_results) in results {
-            let failed_checks: Vec<String> = check_results
+        for group in results {
+            let failed_checks: Vec<String> = group
+                .checks
                 .iter()
-                .filter(|(_, passed)| !passed)
-                .map(|(check_id, _)| check_id.clone())
+                .filter(|check| !check.passed)
+                .map(|check| check.id.clone())
                 .collect();
 
             if !failed_checks.is_empty() {
-                system_map.insert(group_id.clone(), failed_checks);
+                system_map.insert(group.id.clone(), failed_checks);
             }
         }
 
@@ -744,17 +773,4 @@ pub fn load_ignored_checks(path: &str) -> Option<HashMap<String, HashMap<String,
         Ok(contents) => serde_yaml::from_str(&contents).ok(),
         Err(_) => None,
     }
-}
-
-pub fn is_check_ignored(
-    ignored: &HashMap<String, HashMap<String, Vec<String>>>,
-    system: &FlakeReference,
-    group_id: &str,
-    check_id: &str,
-) -> bool {
-    ignored
-        .get(&system.to_string())
-        .and_then(|system_map| system_map.get(group_id))
-        .map(|checks| checks.contains(&check_id.to_string()))
-        .unwrap_or(false)
 }
