@@ -113,4 +113,10 @@ pub enum Command {
         #[arg(value_parser = libnxbd::flakeref::parse_flake_reference)]
         systems: Vec<libnxbd::FlakeReference>,
     },
+
+    #[command(hide = true)]
+    GenerateDocs {
+        #[arg(help = "Directory where to generate the documentation")]
+        output_dir: String,
+    },
 }

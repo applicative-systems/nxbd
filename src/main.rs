@@ -21,6 +21,8 @@ use nix::unistd;
 use owo_colors::OwoColorize;
 use rayon::prelude::*;
 use std::fmt;
+use std::fs::{self, create_dir_all};
+use std::io;
 
 #[derive(Debug)]
 enum NxbdError {
@@ -33,6 +35,7 @@ enum NxbdError {
         local_hostname: String,
     },
     Nix(NixError),
+    Io(io::Error),
 }
 
 impl fmt::Display for NxbdError {
@@ -64,6 +67,7 @@ impl fmt::Display for NxbdError {
                     config_hostname, local_hostname)
             }
             Self::Nix(e) => write!(f, "{}", e),
+            Self::Io(e) => write!(f, "IO error: {}", e),
         }
     }
 }
@@ -73,6 +77,12 @@ impl std::error::Error for NxbdError {}
 impl From<NixError> for NxbdError {
     fn from(err: NixError) -> Self {
         NxbdError::Nix(err)
+    }
+}
+
+impl From<io::Error> for NxbdError {
+    fn from(err: io::Error) -> Self {
+        NxbdError::Io(err)
     }
 }
 
@@ -729,6 +739,45 @@ fn run() -> Result<(), NxbdError> {
                     Err(e) => println!("  {} Error getting system status: {}", "✗".red(), e),
                 }
             }
+        }
+        Command::GenerateDocs { output_dir } => {
+            create_dir_all(&output_dir)?;
+
+            for group in get_standard_checks() {
+                let filename = format!("{}/{}.md", output_dir, group.id);
+                let mut content = String::new();
+
+                // Add header
+                content.push_str(&format!("# {}\n\n", group.name));
+                content.push_str(&format!("{}\n\n", group.description));
+
+                // Add table of contents
+                content.push_str("## Checks\n\n");
+                for check in &group.checks {
+                    content.push_str(&format!(
+                        "- [{} - {}](#{})\n",
+                        check.id, check.description, check.id
+                    ));
+                }
+                content.push('\n');
+
+                // Add detailed check information
+                content.push_str("## Details\n\n");
+                for check in &group.checks {
+                    content.push_str(&format!(
+                        "### {}<a name=\"{}\"></a>\n\n",
+                        check.id, check.id
+                    ));
+                    content.push_str("**Description:**\n");
+                    content.push_str(&format!("{}\n\n", check.description));
+                    content.push_str("**How to fix:**\n");
+                    content.push_str(&format!("{}\n\n", check.advice));
+                }
+
+                fs::write(filename, content)?;
+            }
+
+            eprintln!("Documentation generated in {}", output_dir);
         }
     }
     Ok(())
