@@ -40,8 +40,15 @@ pub enum Command {
 
     #[command(about = "Deploy configurations to remote systems")]
     #[command(
-        long_about = "Deploy NixOS configurations to one or more remote systems. \
-        Supports configuration checks and automatic rebooting if needed."
+        long_about = r#"Deploy NixOS configurations to one or more remote systems.
+Supports configuration checks and automatic rebooting if needed.
+
+This command assumes:
+
+- Deployment target host address is defined by the hostname
+and the (optional) FQDN and is obtained via `config.networking.fqdnOrHostName`.
+- The local user account that runs `nxbd` is used for connecting to the target
+  host via SSH."#
     )]
     SwitchRemote {
         #[arg(help = &format!("{} {}", SYSTEMS_HELP, SYSTEMS_ALL_HELP))]
@@ -59,8 +66,9 @@ pub enum Command {
     },
 
     #[command(about = "Deploy configuration to the local system")]
-    #[command(long_about = "Deploy a NixOS configuration to the local system. \
-        If no system is specified, uses the current hostname as the configuration.")]
+    #[command(long_about = r#"Deploy a NixOS configuration to the local system.
+
+If no system is specified, it uses the current hostname as the flake attribute selector in the flake of the current working directory."#)]
     SwitchLocal {
         #[arg(help = &format!("{} Defaults to `.#<hostname>` if not provided.", SYSTEMS_HELP))]
         #[arg(value_parser = libnxbd::flakeref::parse_flake_reference)]

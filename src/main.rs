@@ -63,7 +63,7 @@ impl fmt::Display for NxbdError {
                 config_hostname,
                 local_hostname,
             } => {
-                write!(f, "Hostname mismatch: system config has '{}' but local system is '{}'\nTo proceed, either:\n - Fix the hostname\n - Rerun with --ignore-hostname", 
+                write!(f, "Hostname mismatch: system config has '{}' but local system is '{}'\nTo proceed, either:\n - Fix the hostname\n - Rerun with --ignore-hostname",
                     config_hostname, local_hostname)
             }
             Self::Nix(e) => write!(f, "{}", e),
@@ -150,31 +150,31 @@ fn run() -> Result<(), NxbdError> {
 
             {
                 // CLI command overview for index.md
-                let mut cli_content = String::new();
-                cli_content.push_str("# `nxbd` CLI Commands\n\n");
-                cli_content.push_str(
+                let mut content = String::new();
+                content.push_str("# `nxbd` CLI Commands\n\n");
+                content.push_str(
                     "This section describes all available commands in the `nxbd` tool.\n\n",
                 );
 
-                cli_content.push_str("## Available Commands\n\n");
+                content.push_str("## Available Commands\n\n");
 
                 for subcmd in app.get_subcommands() {
                     if subcmd.is_hide_set() {
                         continue;
                     }
 
-                    cli_content.push_str(&format!("## `nxbd {}`\n\n", subcmd.get_name()));
+                    content.push_str(&format!("## `nxbd {}`\n\n", subcmd.get_name()));
 
                     if let Some(long_about) = subcmd.get_long_about() {
-                        cli_content.push_str(&format!("{}\n\n", long_about.to_string()));
+                        content.push_str(&format!("{}\n\n", long_about.to_string()));
                     }
+                    content.push_str(&format!("[Details]({}.md)\n\n", subcmd.get_name()));
                 }
 
-                cli_content.push_str("## Global Options\n\n");
-                cli_content
-                    .push_str("- `--verbose`: Show detailed information during execution\n\n");
+                content.push_str("## Global Options\n\n");
+                content.push_str("- `--verbose`: Show detailed information during execution\n\n");
 
-                fs::write(format!("{}/commands/index.md", output_dir), cli_content)?;
+                fs::write(format!("{}/commands/index.md", output_dir), content)?;
             }
 
             // Generate documentation for each command on an individual page
@@ -241,10 +241,11 @@ fn run() -> Result<(), NxbdError> {
             {
                 // Check overview for checks/index.md
                 let mut content = String::new();
+                content.push_str("# `nxbd` NixOS Configuration Checks\n\n");
                 for group in get_standard_checks() {
                     content.push_str(&format!("## {}\n\n", group.name));
                     content.push_str(&format!("{}\n\n", group.description));
-                    content.push_str(&format!("[Details]({}.html)\n\n", group.id));
+                    content.push_str(&format!("[Details]({}.md)\n\n", group.id));
                 }
                 fs::write(format!("{}/checks/index.md", output_dir), content)?;
             }
@@ -344,7 +345,7 @@ fn run() -> Result<(), NxbdError> {
         Command::Build { systems } => {
             let system_attributes = flakerefs_or_default(systems)?;
             if system_attributes.len() > 1 {
-                println!(
+                eprintln!(
                     "{}",
                     format!(
                         "→ Building systems: {}",
@@ -357,10 +358,11 @@ fn run() -> Result<(), NxbdError> {
                     .white()
                 );
             }
+            // TODO: Build only locally buildable systems
             for system in &system_attributes {
                 let result = nixos_deploy_info(system)?;
-                println!("{}", format!("→ Building system: {}", system).white());
-                println!(
+                eprintln!("{}", format!("→ Building system: {}", system).white());
+                eprintln!(
                     "{}",
                     format!("→ Built store path for {}: {}", system, result.toplevel_out).white()
                 );
