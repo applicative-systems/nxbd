@@ -238,9 +238,19 @@ fn run() -> Result<(), NxbdError> {
                 )?;
             }
 
+            {
+                // Check overview for checks/index.md
+                let mut content = String::new();
+                for group in get_standard_checks() {
+                    content.push_str(&format!("## {}\n\n", group.name));
+                    content.push_str(&format!("{}\n\n", group.description));
+                    content.push_str(&format!("[Details]({}.html)\n\n", group.id));
+                }
+                fs::write(format!("{}/checks/index.md", output_dir), content)?;
+            }
+
             // Generate check documentation (existing code)
             for group in get_standard_checks() {
-                let filename = format!("{}/checks/{}.md", output_dir, group.id);
                 let mut content = String::new();
 
                 // Add header
@@ -251,7 +261,7 @@ fn run() -> Result<(), NxbdError> {
                 content.push_str("## Checks\n\n");
                 for check in &group.checks {
                     content.push_str(&format!(
-                        "- [{} - {}](#{})\n",
+                        "- [`{}` - {}](#{})\n",
                         check.id, check.description, check.id
                     ));
                 }
@@ -261,7 +271,7 @@ fn run() -> Result<(), NxbdError> {
                 content.push_str("## Details\n\n");
                 for check in &group.checks {
                     content.push_str(&format!(
-                        "### {}<a name=\"{}\"></a>\n\n",
+                        "### `{}`<a name=\"{}\"></a>\n\n",
                         check.id, check.id
                     ));
                     content.push_str("**Description:**\n");
@@ -270,7 +280,7 @@ fn run() -> Result<(), NxbdError> {
                     content.push_str(&format!("{}\n\n", check.advice));
                 }
 
-                fs::write(filename, content)?;
+                fs::write(format!("{}/checks/{}.md", output_dir, group.id), content)?;
             }
 
             eprintln!("Documentation generated in {}", output_dir);
