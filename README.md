@@ -1,4 +1,17 @@
-# nxbd - NixOS Build & Deploy
+<div align="center">
+
+# nxbd
+
+The smart NixOS Configuration Check, Build, and Deploy Tool
+
+**Presented to you and maintained by <a href="https://applicative.systems/">Applicative Systems</a> and <a href="https://nixcademy.com/">Nixcademy</a>**
+
+<p>
+<a href="https://github.com/applicative-systems/nxbd/actions/workflows/check.yml"><img src="https://github.com/applicative-systems/nxbd/actions/workflows/check.yml/badge.svg"/></a>
+<a href="https://matrix.to/#/#applicative.systems:matrix.org"><img src="https://img.shields.io/badge/Support-%23applicative.systems-blue"/></a>
+</p>
+
+</div>
 
 `nxbd` is a lightweight, safety-focused NixOS deployment tool that helps you manage multiple NixOS systems with confidence. Unlike other deployment tools, `nxbd` focuses on validating your configurations before deployment to prevent common pitfalls and system lockouts.
 
@@ -222,3 +235,12 @@ nix profile install github:applicative-systems/nxbd
 ## Contributing
 
 Contributions are welcome! Feel free to open issues or submit pull requests.
+
+## Commercial Support
+
+Do you need some additions to this tool to support your internal processes?
+Would you like to have similar but new open or closed source tool?
+
+Contact us via mail
+[hello@applicative.systems](mailto:hello@applicative.systems)
+or schedule a meeting: <https://nixcademy.com/meet>
