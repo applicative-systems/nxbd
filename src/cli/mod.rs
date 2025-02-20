@@ -2,6 +2,9 @@ use clap::{Parser, Subcommand};
 
 use crate::libnxbd;
 
+const SYSTEMS_HELP: &str = "System selection in flakes attribute syntax (e.g., `.#hostname` or `github:user/repo#hostname`).";
+const SYSTEMS_ALL_HELP: &str = "Can be one or many. Will select all systems in the flake in the current directory if not specified.";
+
 #[derive(Parser, Debug)]
 #[command(name = "nxbd")]
 #[command(about = "Build and deploy NixOS systems using flakes")]
@@ -30,7 +33,7 @@ pub enum Command {
         This is useful for testing builds or preparing systems for deployment."
     )]
     Build {
-        #[arg(help = "Systems to build (e.g., '.#hostname' or 'github:user/repo#hostname')")]
+        #[arg(help = &format!("{} {}", SYSTEMS_HELP, SYSTEMS_ALL_HELP))]
         #[arg(value_parser = libnxbd::flakeref::parse_flake_reference)]
         systems: Vec<libnxbd::FlakeReference>,
     },
@@ -41,9 +44,7 @@ pub enum Command {
         Supports configuration checks and automatic rebooting if needed."
     )]
     SwitchRemote {
-        #[arg(
-            help = "One or multiple systems to deploy (e.g., '.#hostname' or 'github:user/repo#hostname'). Will deploy all systems if not specified."
-        )]
+        #[arg(help = &format!("{} {}", SYSTEMS_HELP, SYSTEMS_ALL_HELP))]
         #[arg(value_parser = libnxbd::flakeref::parse_flake_reference)]
         systems: Vec<libnxbd::FlakeReference>,
 
@@ -61,7 +62,7 @@ pub enum Command {
     #[command(long_about = "Deploy a NixOS configuration to the local system. \
         If no system is specified, uses the current hostname as the configuration.")]
     SwitchLocal {
-        #[arg(help = "System to deploy (defaults to .#<hostname>)")]
+        #[arg(help = &format!("{} Defaults to `.#<hostname>` if not provided.", SYSTEMS_HELP))]
         #[arg(value_parser = libnxbd::flakeref::parse_flake_reference)]
         system: Option<libnxbd::FlakeReference>,
 
@@ -79,7 +80,7 @@ pub enum Command {
     #[command(long_about = "Run configuration checks on one or more systems. \
         Checks can verify system configuration, SSH keys, and other deployment requirements.")]
     Check {
-        #[arg(help = "Systems to check (e.g., '.#hostname' or 'github:user/repo#hostname')")]
+        #[arg(help = &format!("{} {}", SYSTEMS_HELP, SYSTEMS_ALL_HELP))]
         #[arg(value_parser = libnxbd::flakeref::parse_flake_reference)]
         systems: Vec<libnxbd::FlakeReference>,
 
@@ -106,10 +107,7 @@ pub enum Command {
         including deployment status, reboot requirements, and system health."
     )]
     Status {
-        #[arg(
-            help = "Systems to check (e.g., '.#hostname' or 'github:user/repo#hostname'). \
-            Will check all systems if not specified."
-        )]
+        #[arg(help = &format!("{} {}", SYSTEMS_HELP, SYSTEMS_ALL_HELP))]
         #[arg(value_parser = libnxbd::flakeref::parse_flake_reference)]
         systems: Vec<libnxbd::FlakeReference>,
     },
