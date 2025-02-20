@@ -156,5 +156,6 @@ Contact us:
 ## Community
 
 Join our community:
+
 - Matrix: [#applicative.systems:matrix.org](https://matrix.to/#/#applicative.systems:matrix.org)
 - GitHub: [applicative-systems/nxbd](https://github.com/applicative-systems/nxbd)
