@@ -181,7 +181,7 @@ Add to your flake.nix:
 
 ```nix
 {
-  inputs.nxbd.url = "github:yourusername/nxbd";
+  inputs.nxbd.url = "github:applicative-systems/nxbd";
 
   outputs = { self, nixpkgs, nxbd }: {
     # For your packages
@@ -201,7 +201,7 @@ Add to your flake.nix:
 ### Direct Installation in the Nix Profile
 
 ```bash
-nix profile install github:yourusername/nxbd
+nix profile install github:applicative-systems/nxbd
 ```
 
 ## Requirements
