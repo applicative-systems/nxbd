@@ -117,7 +117,7 @@ pub fn get_standard_checks() -> Vec<CheckGroup> {
                 Check::new(
                     "ssh_enabled",
                     "SSH service must be enabled",
-                    "Set services.openssh.enable = true",
+                    "Set  `services.openssh.enable = true`",
                     |config, _user_info| {
                         if !config.ssh_enabled {
                             Err(CheckError {
@@ -132,7 +132,7 @@ pub fn get_standard_checks() -> Vec<CheckGroup> {
                 Check::new(
                     "sudo_enabled",
                     "Sudo must be available",
-                    "Enable sudo in your configuration",
+                    "Set `security.sudo.enable = true`",
                     |config, _user_info| {
                         if !config.sudo_enabled {
                             Err(CheckError {
@@ -147,7 +147,7 @@ pub fn get_standard_checks() -> Vec<CheckGroup> {
                 Check::new(
                     "wheel_passwordless",
                     "Wheel group should not require password for sudo",
-                    "Set security.sudo.wheelNeedsPassword = false",
+                    "Set  `security.sudo.wheelNeedsPassword = false`",
                     |config, _user_info| {
                         if config.wheel_needs_password {
                             Err(CheckError {
@@ -162,12 +162,12 @@ pub fn get_standard_checks() -> Vec<CheckGroup> {
                 Check::new(
                     "nix_trusts_wheel",
                     "Wheel group must be trusted by Nix",
-                    "Add '@wheel' to nix.settings.trusted-users",
+                    "Add `@wheel` to `nix.settings.trusted-users`",
                     |config, _user_info| {
                         if !config.nix_trusts_wheel {
                             Err(CheckError {
                                 check_name: "Nix Trust".to_string(),
-                                message: "Wheel group is not trusted by nix".to_string(),
+                                message: "`wheel` group is not trusted by nix".to_string(),
                             })
                         } else {
                             Ok(())
@@ -243,7 +243,7 @@ pub fn get_standard_checks() -> Vec<CheckGroup> {
                 Check::new(
                     "wheel_only",
                     "Only wheel group members should be allowed to use sudo",
-                    "Set security.sudo.execWheelOnly = true",
+                    "Set  `security.sudo.execWheelOnly = true`",
                     |config, _user_info| {
                         if !config.sudo_wheel_only {
                             Err(CheckError {
@@ -258,7 +258,7 @@ pub fn get_standard_checks() -> Vec<CheckGroup> {
                 Check::new(
                     "ssh_password_authentication",
                     "Password authentication should be disabled for SSH",
-                    "Set services.openssh.settings.PasswordAuthentication = false",
+                    "Set  `services.openssh.settings.PasswordAuthentication = false`",
                     |config, _user_info| {
                         if config.ssh_password_authentication {
                             Err(CheckError {
@@ -273,12 +273,12 @@ pub fn get_standard_checks() -> Vec<CheckGroup> {
                 Check::new(
                     "users_immutable",
                     "Users should be managed through NixOS configuration",
-                    "Set users.mutableUsers = false",
+                    "Set  `users.mutableUsers = false`",
                     |config, _user_info| {
                         if config.users_mutable {
                             Err(CheckError {
                                 check_name: "Mutable Users".to_string(),
-                                message: "Users can be modified outside of the NixOS configuration. Consider setting users.mutableUsers = false for better system reproducibility".to_string(),
+                                message: "Users can be modified outside of the NixOS configuration. Consider setting  `users.mutableUsers = false` for better system reproducibility".to_string(),
                             })
                         } else {
                             Ok(())
@@ -288,12 +288,12 @@ pub fn get_standard_checks() -> Vec<CheckGroup> {
                 Check::new(
                     "firewall_enabled",
                     "The system firewall should be enabled for better security",
-                    "Set networking.firewall.enable = true",
+                    "Set  `networking.firewall.enable = true`",
                     |config, _user_info| {
                         if !config.networking_firewall_enabled {
                             Err(CheckError {
                                 check_name: "Firewall".to_string(),
-                                message: "System firewall is not enabled. Consider setting networking.firewall.enable = true".to_string(),
+                                message: "System firewall is not enabled. Consider setting  `networking.firewall.enable = true`".to_string(),
                             })
                         } else {
                             Ok(())
@@ -303,12 +303,12 @@ pub fn get_standard_checks() -> Vec<CheckGroup> {
                 Check::new(
                     "log_refused_connections",
                     "The logging of refused connections should be deactivated to avoid flooding the logs and possibly leaving important messages unseen. Consider using it only for debugging firewall rules.",
-                    "Set networking.firewall.logRefusedConnections = false",
+                    "Set  `networking.firewall.logRefusedConnections = false`",
                     |config, _user_info| {
                         if config.log_refused_connections {
                             Err(CheckError {
                                 check_name: "Log refused connections".to_string(),
-                                message: "Logging of refused connections should be disabled. Consider setting networking.firewall.logRefusedConnections = false".to_string(),
+                                message: "Logging of refused connections should be disabled. Consider setting  `networking.firewall.logRefusedConnections = false`".to_string(),
                             })
                         } else {
                             Ok(())
@@ -325,7 +325,7 @@ pub fn get_standard_checks() -> Vec<CheckGroup> {
                 Check::new(
                     "system_generations_limit",
                     "The retention of old system generations should be limited, as these are protected from garbage collection and consume disk space unnecessarily.",
-                    "Set boot.systemd.generations = 10 or less for systemd-boot, or boot.grub.generations = 10 or less for GRUB",
+                    "Set `boot.systemd.generations = 10` or less for systemd-boot, or `boot.grub.generations = 10` or less for GRUB",
                     |config, _user_info| {
                         fn check_generations(enabled: bool, limit: Option<i32>, bootloader: &str) -> Result<(), CheckError> {
                             if !enabled {
@@ -357,7 +357,7 @@ pub fn get_standard_checks() -> Vec<CheckGroup> {
                 Check::new(
                     "journald_limits",
                     "journald space limits should be configured to avoid clogging the disk with logs.",
-                    "Set either 'SystemKeepFree' or both 'SystemMaxUse' and 'SystemMaxFileSize'",
+                    "Set either `SystemKeepFree` or both `SystemMaxUse` and `SystemMaxFileSize` in `services.journald.extraConfig`",
                     |config, _user_info| {
                         let config_str = &config.journald_extra_config;
                         let has_max_use = config_str.contains("SystemMaxUse=");
@@ -367,7 +367,7 @@ pub fn get_standard_checks() -> Vec<CheckGroup> {
                         if !has_keep_free && !(has_max_use && has_max_file_size) {
                             Err(CheckError {
                                 check_name: "Journald Limits".to_string(),
-                                message: "No journald space limits configured. Set either 'SystemKeepFree' or both 'SystemMaxUse' and 'SystemMaxFileSize'".to_string(),
+                                message: "No journald space limits configured. Set either `SystemKeepFree` or both `SystemMaxUse` and `SystemMaxFileSize` in `services.journald.extraConfig`".to_string(),
                             })
                         } else {
                             Ok(())
@@ -377,12 +377,12 @@ pub fn get_standard_checks() -> Vec<CheckGroup> {
                 Check::new(
                     "nix_gc",
                     "Regular Nix Garbage Collection should be enabled",
-                    "Set nix.gc.automatic = true",
+                    "Set  `nix.gc.automatic = true`",
                     |config, _user_info| {
                         if !config.nix_gc {
                             Err(CheckError {
                                 check_name: "Garbage Collection".to_string(),
-                                message: "Garbage Collection is not enabled. Consider setting nix.gc.automatic = true".to_string(),
+                                message: "Garbage Collection is not enabled. Consider setting  `nix.gc.automatic = true`".to_string(),
                             })
                         } else {
                             Ok(())
@@ -392,14 +392,14 @@ pub fn get_standard_checks() -> Vec<CheckGroup> {
                 Check::new(
                     "nix_optimise_automatic",
                     "Nix store optimisation should be enabled",
-                    "Set either nix.settings.auto-optimise-store or nix.optimise.automatic",
+                    "Set either `nix.settings.auto-optimise-store` or `nix.optimise.automatic`",
                     |config, _user_info| {
                         if config.boot_is_container {
                             Ok(())
                         } else if !config.nix_optimise_automatic && !config.nix_auto_optimise_store {
                             Err(CheckError {
                                 check_name: "Nix store optimisation".to_string(),
-                                message: "Nix store optimisation is disabled. Set either nix.settings.auto-optimise-store or nix.optimise.automatic".to_string(),
+                                message: "Nix store optimisation is disabled. Set either `nix.settings.auto-optimise-store` or `nix.optimise.automatic`".to_string(),
                             })
                         } else {
                             Ok(())
@@ -453,13 +453,13 @@ pub fn get_standard_checks() -> Vec<CheckGroup> {
                 Check::new(
                     "doc_nixos",
                     "NixOS documentation should be disabled to reduce system closure size",
-                    "Set documentation.nixos.enable = false",
+                    "Set  `documentation.nixos.enable = false`",
                     |config, _user_info| {
                         if config.fqdn.is_some() {
                             if config.doc_nixos_enabled {
                                 Err(CheckError {
                                     check_name: "Documentation".to_string(),
-                                    message: "NixOS documentation enabled. Consider setting documentation.nixos.enable = false".to_string(),
+                                    message: "NixOS documentation enabled. Consider setting  `documentation.nixos.enable = false`".to_string(),
                                 })
                             } else {
                                 Ok(())
@@ -472,13 +472,13 @@ pub fn get_standard_checks() -> Vec<CheckGroup> {
                 Check::new(
                     "documentation",
                     "General documentation should be disabled to reduce system closure size",
-                    "Set documentation.enable = false",
+                    "Set  `documentation.enable = false`",
                     |config, _user_info| {
                         if config.fqdn.is_some() {
                             if config.doc_enable {
                                 Err(CheckError {
                                     check_name: "Documentation".to_string(),
-                                    message: "General documentation enabled. Consider setting documentation.enable = false".to_string(),
+                                    message: "General documentation enabled. Consider setting  `documentation.enable = false`".to_string(),
                                 })
                             } else {
                                 Ok(())
@@ -491,13 +491,13 @@ pub fn get_standard_checks() -> Vec<CheckGroup> {
                 Check::new(
                     "doc_dev",
                     "Development documentation should be disabled to reduce system closure size",
-                    "Set documentation.dev.enable = false",
+                    "Set  `documentation.dev.enable = false`",
                     |config, _user_info| {
                         if config.fqdn.is_some() {
                             if config.doc_dev_enable {
                                 Err(CheckError {
                                     check_name: "Documentation".to_string(),
-                                    message: "Development documentation enabled. Consider setting documentation.dev.enable = false".to_string(),
+                                    message: "Development documentation enabled. Consider setting  `documentation.dev.enable = false`".to_string(),
                                 })
                             } else {
                                 Ok(())
@@ -510,13 +510,13 @@ pub fn get_standard_checks() -> Vec<CheckGroup> {
                 Check::new(
                     "doc_doc",
                     "Doc documentation should be disabled to reduce system closure size",
-                    "Set documentation.doc.enable = false",
+                    "Set  `documentation.doc.enable = false`",
                     |config, _user_info| {
                         if config.fqdn.is_some() {
                             if config.doc_doc_enable {
                                 Err(CheckError {
                                     check_name: "Documentation".to_string(),
-                                    message: "Doc documentation enabled. Consider setting documentation.doc.enable = false".to_string(),
+                                    message: "Doc documentation enabled. Consider setting  `documentation.doc.enable = false`".to_string(),
                                 })
                             } else {
                                 Ok(())
@@ -529,13 +529,13 @@ pub fn get_standard_checks() -> Vec<CheckGroup> {
                 Check::new(
                     "doc_info",
                     "Info documentation should be disabled to reduce system closure size",
-                    "Set documentation.info.enable = false",
+                    "Set  `documentation.info.enable = false`",
                     |config, _user_info| {
                         if config.fqdn.is_some() {
                             if config.doc_info_enable {
                                 Err(CheckError {
                                     check_name: "Documentation".to_string(),
-                                    message: "Info documentation enabled. Consider setting documentation.info.enable = false".to_string(),
+                                    message: "Info documentation enabled. Consider setting  `documentation.info.enable = false`".to_string(),
                                 })
                             } else {
                                 Ok(())
@@ -548,13 +548,13 @@ pub fn get_standard_checks() -> Vec<CheckGroup> {
                 Check::new(
                     "doc_man",
                     "Man pages should be disabled to reduce system closure size",
-                    "Set documentation.man.enable = false",
+                    "Set  `documentation.man.enable = false`",
                     |config, _user_info| {
                         if config.fqdn.is_some() {
                             if config.doc_man_enable {
                                 Err(CheckError {
                                     check_name: "Documentation".to_string(),
-                                    message: "Man pages enabled. Consider setting documentation.man.enable = false".to_string(),
+                                    message: "Man pages enabled. Consider setting  `documentation.man.enable = false`".to_string(),
                                 })
                             } else {
                                 Ok(())
@@ -567,12 +567,12 @@ pub fn get_standard_checks() -> Vec<CheckGroup> {
                 Check::new(
                     "fontconfig",
                     "Font configuration should be disabled on servers to reduce system closure size",
-                    "Set fonts.fontconfig.enable = false",
+                    "Set  `fonts.fontconfig.enable = false`",
                     |config, _user_info| {
                         if config.fqdn.is_some() && config.font_fontconfig_enable{
                             Err(CheckError {
                                 check_name: "Font Configuration".to_string(),
-                                message: "Font configuration is enabled. Consider setting fonts.fontconfig.enable = false on servers".to_string(),
+                                message: "Font configuration is enabled. Consider setting  `fonts.fontconfig.enable = false` on servers".to_string(),
                             })
                         } else {
                             Ok(())
@@ -582,12 +582,12 @@ pub fn get_standard_checks() -> Vec<CheckGroup> {
                 Check::new(
                     "stub_ld",
                     "Stub-ld is typically not needed on servers and increases system closure size",
-                    "Set environment.stub-ld.enable = false",
+                    "Set  `environment.stub-ld.enable = false`",
                     |config, _user_info| {
                         if config.fqdn.is_some() && config.stub_ld {
                             Err(CheckError {
                                 check_name: "Stub LD".to_string(),
-                                message: "Stub-ld is enabled but typically not needed on servers. Consider setting environment.stub-ld.enable = false to reduce system closure size".to_string(),
+                                message: "Stub-ld is enabled but typically not needed on servers. Consider setting  `environment.stub-ld.enable = false` to reduce system closure size".to_string(),
                             })
                         } else {
                             Ok(())
@@ -597,12 +597,12 @@ pub fn get_standard_checks() -> Vec<CheckGroup> {
                 Check::new(
                     "command_not_found",
                     "The command-not-found program is typically not needed on servers and increases system closure size",
-                    "Set programs.command-not-found.enable = false",
+                    "Set  `programs.command-not-found.enable = false`",
                     |config, _user_info| {
                         if config.fqdn.is_some() && config.command_not_found {
                             Err(CheckError {
                                 check_name: "Command Not Found".to_string(),
-                                message: "The command-not-found program is enabled but typically not needed on servers. Consider setting programs.command-not-found.enable = false to reduce system closure size".to_string(),
+                                message: "The command-not-found program is enabled but typically not needed on servers. Consider setting  `programs.command-not-found.enable = false` to reduce system closure size".to_string(),
                             })
                         } else {
                             Ok(())
@@ -612,13 +612,13 @@ pub fn get_standard_checks() -> Vec<CheckGroup> {
                 Check::new(
                     "nginx_brotli",
                     "Brotli compression should be enabled",
-                    "Set services.nginx.recommendedBrotliSettings = true",
+                    "Set  `services.nginx.recommendedBrotliSettings = true`",
                     |config, _user_info| {
                         if config.nginx_enabled {
                             if !config.nginx_brotli {
                                 Err(CheckError {
                                     check_name: "Nginx Settings".to_string(),
-                                    message: "Brotli compression not enabled. Consider setting services.nginx.recommendedBrotliSettings = true".to_string(),
+                                    message: "Brotli compression not enabled. Consider setting  `services.nginx.recommendedBrotliSettings = true`".to_string(),
                                 })
                             } else {
                                 Ok(())
@@ -631,13 +631,13 @@ pub fn get_standard_checks() -> Vec<CheckGroup> {
                 Check::new(
                     "nginx_gzip",
                     "Gzip compression should be enabled",
-                    "Set services.nginx.recommendedGzipSettings = true",
+                    "Set  `services.nginx.recommendedGzipSettings = true`",
                     |config, _user_info| {
                         if config.nginx_enabled {
                             if !config.nginx_gzip {
                                 Err(CheckError {
                                     check_name: "Nginx Settings".to_string(),
-                                    message: "Gzip compression not enabled. Consider setting services.nginx.recommendedGzipSettings = true".to_string(),
+                                    message: "Gzip compression not enabled. Consider setting  `services.nginx.recommendedGzipSettings = true`".to_string(),
                                 })
                             } else {
                                 Ok(())
@@ -650,13 +650,13 @@ pub fn get_standard_checks() -> Vec<CheckGroup> {
                 Check::new(
                     "nginx_optimisation",
                     "Optimisation settings should be enabled",
-                    "Set services.nginx.recommendedOptimisation = true",
+                    "Set  `services.nginx.recommendedOptimisation = true`",
                     |config, _user_info| {
                         if config.nginx_enabled {
                             if !config.nginx_optimisation {
                                 Err(CheckError {
                                     check_name: "Nginx Settings".to_string(),
-                                    message: "Optimisation settings not enabled. Consider setting services.nginx.recommendedOptimisation = true".to_string(),
+                                    message: "Optimisation settings not enabled. Consider setting  `services.nginx.recommendedOptimisation = true`".to_string(),
                                 })
                             } else {
                                 Ok(())
@@ -669,13 +669,13 @@ pub fn get_standard_checks() -> Vec<CheckGroup> {
                 Check::new(
                     "nginx_proxy",
                     "Proxy settings should be enabled",
-                    "Set services.nginx.recommendedProxySettings = true",
+                    "Set  `services.nginx.recommendedProxySettings = true`",
                     |config, _user_info| {
                         if config.nginx_enabled {
                             if !config.nginx_proxy {
                                 Err(CheckError {
                                     check_name: "Nginx Settings".to_string(),
-                                    message: "Proxy settings not enabled. Consider setting services.nginx.recommendedProxySettings = true".to_string(),
+                                    message: "Proxy settings not enabled. Consider setting  `services.nginx.recommendedProxySettings = true`".to_string(),
                                 })
                             } else {
                                 Ok(())
@@ -688,13 +688,13 @@ pub fn get_standard_checks() -> Vec<CheckGroup> {
                 Check::new(
                     "nginx_tls",
                     "TLS settings should be enabled",
-                    "Set services.nginx.recommendedTlsSettings = true",
+                    "Set  `services.nginx.recommendedTlsSettings = true`",
                     |config, _user_info| {
                         if config.nginx_enabled {
                             if !config.nginx_tls {
                                 Err(CheckError {
                                     check_name: "Nginx Settings".to_string(),
-                                    message: "TLS settings not enabled. Consider setting services.nginx.recommendedTlsSettings = true".to_string(),
+                                    message: "TLS settings not enabled. Consider setting  `services.nginx.recommendedTlsSettings = true`".to_string(),
                                 })
                             } else {
                                 Ok(())
@@ -714,13 +714,13 @@ pub fn get_standard_checks() -> Vec<CheckGroup> {
                 Check::new(
                     "cpu_microcode",
                     "CPU microcode updates should be enabled on Intel architecture",
-                    "Set either hardware.cpu.intel.updateMicrocode or hardware.cpu.amd.updateMicrocode",
+                    "Set either `hardware.cpu.intel.updateMicrocode` or `hardware.cpu.amd.updateMicrocode`",
                     |config, _user_info| {
                         if config.is_x86 {
                             if !config.intel_microcode && !config.amd_microcode {
                                 Err(CheckError {
                                     check_name: "Microcode".to_string(),
-                                    message: "No CPU microcode updates enabled. Set either hardware.cpu.intel.updateMicrocode or hardware.cpu.amd.updateMicrocode to true".to_string(),
+                                    message: "No CPU microcode updates enabled. Set either `hardware.cpu.intel.updateMicrocode` or `hardware.cpu.amd.updateMicrocode` to `true`".to_string(),
                                 })
                             } else {
                                 Ok(())
