@@ -236,9 +236,9 @@ pub fn get_standard_checks() -> Vec<CheckGroup> {
             ],
         },
         CheckGroup {
-            id: "sudo_security".to_string(),
-            name: "Sudo Security Settings".to_string(),
-            description: "Checks if sudo is configured securely".to_string(),
+            id: "system_security".to_string(),
+            name: "System Security Settings".to_string(),
+            description: "Checks if critical system security settings are properly configured".to_string(),
             checks: vec![
                 Check::new(
                     "wheel_only",
@@ -255,13 +255,6 @@ pub fn get_standard_checks() -> Vec<CheckGroup> {
                         }
                     },
                 ),
-            ],
-        },
-        CheckGroup {
-            id: "firewall_settings".to_string(),
-            name: "Firewall settings".to_string(),
-            description: "Check whether firewall is configured correctly".to_string(),
-            checks: vec![
                 Check::new(
                     "log_refused_connections",
                     "Logging of refused connections should be disabled",
@@ -280,75 +273,42 @@ pub fn get_standard_checks() -> Vec<CheckGroup> {
             ],
         },
         CheckGroup {
-            id: "boot_configuration_limit".to_string(),
-            name: "Boot Configuration Limit".to_string(),
-            description: "Checks if system configuration generations are reasonably limited to prevent disk space waste".to_string(),
+            id: "system_maintenance".to_string(),
+            name: "System Maintenance Settings".to_string(),
+            description: "Checks if system maintenance and cleanup settings are properly configured".to_string(),
             checks: vec![
                 Check::new(
-                    "boot_systemd_generations",
-                    "systemd-boot generations should be limited",
-                    "Set boot.systemd.generations = 10 or less",
+                    "system_generations_limit",
+                    "System generations should be limited",
+                    "Set boot.systemd.generations = 10 or less for systemd-boot, or boot.grub.generations = 10 or less for GRUB",
                     |config, _user_info| {
-                        if config.boot_systemd {
-                            if let Some(limit) = config.boot_systemd_generations {
-                                if limit > 10 {
-                                    Err(CheckError {
-                                        check_name: "systemd-boot Generations".to_string(),
-                                        message: format!(
-                                            "Too many generations kept ({}). Consider reducing to 10 or less",
-                                            limit
-                                        ),
-                                    })
-                                } else {
-                                    Ok(())
-                                }
-                            } else {
-                                Err(CheckError {
-                                    check_name: "systemd-boot Generations".to_string(),
-                                    message: "No generation limit set. This may prevent old generations from being garbage collected".to_string(),
-                                })
+                        fn check_generations(enabled: bool, limit: Option<i32>, bootloader: &str) -> Result<(), CheckError> {
+                            if !enabled {
+                                return Ok(());
                             }
-                        } else {
-                            Ok(())
+                            match limit {
+                                Some(limit) if limit > 10 => Err(CheckError {
+                                    check_name: "Boot Generations".to_string(),
+                                    message: format!(
+                                        "Too many {} generations kept ({}). Consider reducing to 10 or less",
+                                        bootloader, limit
+                                    ),
+                                }),
+                                None => Err(CheckError {
+                                    check_name: "Boot Generations".to_string(),
+                                    message: format!(
+                                        "No {} generation limit set. This may prevent old generations from being garbage collected",
+                                        bootloader
+                                    ),
+                                }),
+                                _ => Ok(()),
+                            }
                         }
+
+                        check_generations(config.boot_systemd, config.boot_systemd_generations, "systemd-boot")
+                            .or_else(|_| check_generations(config.boot_grub, config.boot_grub_generations, "GRUB"))
                     },
                 ),
-                Check::new(
-                    "boot_grub_generations",
-                    "GRUB generations should be limited",
-                    "Set boot.grub.generations = 10 or less",
-                    |config, _user_info| {
-                        if config.boot_grub {
-                            if let Some(limit) = config.boot_grub_generations {
-                                if limit > 10 {
-                                    Err(CheckError {
-                                        check_name: "GRUB Generations".to_string(),
-                                        message: format!(
-                                            "Too many generations kept ({}). Consider reducing to 10 or less",
-                                            limit
-                                        ),
-                                    })
-                                } else {
-                                    Ok(())
-                                }
-                            } else {
-                                Err(CheckError {
-                                    check_name: "GRUB Generations".to_string(),
-                                    message: "No generation limit set. This may prevent old generations from being garbage collected".to_string(),
-                                })
-                            }
-                        } else {
-                            Ok(())
-                        }
-                    },
-                ),
-            ],
-        },
-        CheckGroup {
-            id: "disk_space_management".to_string(),
-            name: "Disk Space Management".to_string(),
-            description: "Checks whether the optimisations and limits for disk space are configured".to_string(),
-            checks: vec![
                 Check::new(
                     "journald_limits",
                     "journald space limits should be configured",
@@ -370,12 +330,26 @@ pub fn get_standard_checks() -> Vec<CheckGroup> {
                     },
                 ),
                 Check::new(
+                    "nix_gc",
+                    "Garbage Collection should be enabled",
+                    "Set nix.gc.automatic = true",
+                    |config, _user_info| {
+                        if !config.nix_gc {
+                            Err(CheckError {
+                                check_name: "Garbage Collection".to_string(),
+                                message: "Garbage Collection is not enabled. Consider setting nix.gc.automatic = true".to_string(),
+                            })
+                        } else {
+                            Ok(())
+                        }
+                    },
+                ),
+                Check::new(
                     "nix_optimise_automatic",
                     "Nix store optimisation should be enabled",
                     "Set either nix.settings.auto-optimise-store or nix.optimise.automatic",
                     |config, _user_info| {
                         if config.boot_is_container {
-                            // Skip check for containers as they don't have their own nix store
                             Ok(())
                         } else if !config.nix_optimise_automatic && !config.nix_auto_optimise_store {
                             Err(CheckError {
@@ -390,9 +364,9 @@ pub fn get_standard_checks() -> Vec<CheckGroup> {
             ],
         },
         CheckGroup {
-            id: "nix_flakes".to_string(),
-            name: "Nix Flakes".to_string(),
-            description: "Checks if flakes are enabled".to_string(),
+            id: "nix_configuration".to_string(),
+            name: "Nix Configuration".to_string(),
+            description: "Checks if Nix is configured with recommended settings".to_string(),
             checks: vec![
                 Check::new(
                     "nix_extra_options",
@@ -427,9 +401,9 @@ pub fn get_standard_checks() -> Vec<CheckGroup> {
             ],
         },
         CheckGroup {
-            id: "disable_documentation".to_string(),
-            name: "Disable Documentation on Servers".to_string(),
-            description: "Checks if documentation is disabled on servers to reduce closure size".to_string(),
+            id: "server_optimization".to_string(),
+            name: "Server Optimization Settings".to_string(),
+            description: "Checks if server-specific optimizations are properly configured".to_string(),
             checks: vec![
                 Check::new(
                     "doc_nixos_enabled",
@@ -545,39 +519,6 @@ pub fn get_standard_checks() -> Vec<CheckGroup> {
                         }
                     },
                 ),
-            ],
-        },
-        CheckGroup {
-            id: "enable_cpu_microcode_updates".to_string(),
-            name: "Enable CPU Microcode Updates on x86".to_string(),
-            description: "Checks if CPU microcode updates are enabled on x86 systems".to_string(),
-            checks: vec![
-                Check::new(
-                    "cpu_microcode",
-                    "CPU microcode updates should be enabled",
-                    "Set either hardware.cpu.intel.updateMicrocode or hardware.cpu.amd.updateMicrocode",
-                    |config, _user_info| {
-                        if config.is_x86 {
-                            if !config.intel_microcode && !config.amd_microcode {
-                                Err(CheckError {
-                                    check_name: "Microcode".to_string(),
-                                    message: "No CPU microcode updates enabled. Set either hardware.cpu.intel.updateMicrocode or hardware.cpu.amd.updateMicrocode to true".to_string(),
-                                })
-                            } else {
-                                Ok(())
-                            }
-                        } else {
-                            Ok(())
-                        }
-                    },
-                ),
-            ],
-        },
-        CheckGroup {
-            id: "nginx_recommended_settings".to_string(),
-            name: "Nginx Recommended Settings".to_string(),
-            description: "Checks if nginx has recommended settings enabled".to_string(),
-            checks: vec![
                 Check::new(
                     "nginx_brotli",
                     "Brotli compression should be enabled",
@@ -676,20 +617,24 @@ pub fn get_standard_checks() -> Vec<CheckGroup> {
             ],
         },
         CheckGroup {
-            id: "garbage_collection".to_string(),
-            name: "Garbage Collection".to_string(),
-            description: "Checks whether the Nix garbage collection is configured correctly".to_string(),
+            id: "hardware_configuration".to_string(),
+            name: "Hardware Configuration".to_string(),
+            description: "Checks if hardware-specific settings are properly configured".to_string(),
             checks: vec![
                 Check::new(
-                    "nix_gc",
-                    "Garbage Collection should be enabled",
-                    "Set nix.gc.automatic = true",
+                    "cpu_microcode",
+                    "CPU microcode updates should be enabled",
+                    "Set either hardware.cpu.intel.updateMicrocode or hardware.cpu.amd.updateMicrocode",
                     |config, _user_info| {
-                        if !config.nix_gc {
-                            Err(CheckError {
-                                check_name: "Garbage Collection".to_string(),
-                                message: "Garbage Collection is not enabled. Consider setting nix.gc.automatic = true".to_string(),
-                            })
+                        if config.is_x86 {
+                            if !config.intel_microcode && !config.amd_microcode {
+                                Err(CheckError {
+                                    check_name: "Microcode".to_string(),
+                                    message: "No CPU microcode updates enabled. Set either hardware.cpu.intel.updateMicrocode or hardware.cpu.amd.updateMicrocode to true".to_string(),
+                                })
+                            } else {
+                                Ok(())
+                            }
                         } else {
                             Ok(())
                         }
