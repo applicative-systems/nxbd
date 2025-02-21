@@ -256,6 +256,21 @@ pub fn get_standard_checks() -> Vec<CheckGroup> {
                     },
                 ),
                 Check::new(
+                    "ssh_password_authentication",
+                    "Password authentication should be disabled for SSH",
+                    "Set services.openssh.settings.PasswordAuthentication = false",
+                    |config, _user_info| {
+                        if config.ssh_password_authentication {
+                            Err(CheckError {
+                                check_name: "SSH Password Auth".to_string(),
+                                message: "SSH password authentication is enabled. Consider disabling it and using only key-based authentication for better security".to_string(),
+                            })
+                        } else {
+                            Ok(())
+                        }
+                    },
+                ),
+                Check::new(
                     "users_immutable",
                     "Users should be managed through NixOS configuration",
                     "Set users.mutableUsers = false",

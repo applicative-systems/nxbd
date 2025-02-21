@@ -16,6 +16,7 @@ pub struct ConfigInfo {
     pub wheel_needs_password: bool,
     pub sudo_wheel_only: bool,
     pub ssh_enabled: bool,
+    pub ssh_password_authentication: bool,
     pub sudo_enabled: bool,
     pub nix_trusts_wheel: bool,
     pub boot_systemd: bool,
@@ -118,6 +119,7 @@ pub fn nixos_deploy_info(flake_reference: &FlakeReference) -> Result<ConfigInfo,
             nixTrustsWheel = builtins.elem "@wheel" config.nix.settings.trusted-users;
             networkingFirewallEnabled = config.networking.firewall.enable;
             sshEnabled = config.services.openssh.enable;
+            sshPasswordAuthentication = config.services.openssh.settings.PasswordAuthentication;
             sudoEnabled = config.security.sudo.enable;
             sudoWheelOnly = config.security.sudo.execWheelOnly;
             toplevelDrv = config.system.build.toplevel.drvPath;
