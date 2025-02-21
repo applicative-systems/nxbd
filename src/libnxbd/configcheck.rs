@@ -565,6 +565,21 @@ pub fn get_standard_checks() -> Vec<CheckGroup> {
                     },
                 ),
                 Check::new(
+                    "stub_ld",
+                    "Stub-ld is typically not needed on servers and increases system closure size",
+                    "Set environment.stub-ld.enable = false",
+                    |config, _user_info| {
+                        if config.fqdn.is_some() && config.stub_ld {
+                            Err(CheckError {
+                                check_name: "Stub LD".to_string(),
+                                message: "Stub-ld is enabled but typically not needed on servers. Consider setting environment.stub-ld.enable = false to reduce system closure size".to_string(),
+                            })
+                        } else {
+                            Ok(())
+                        }
+                    },
+                ),
+                Check::new(
                     "nginx_brotli",
                     "Brotli compression should be enabled",
                     "Set services.nginx.recommendedBrotliSettings = true",
