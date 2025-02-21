@@ -30,6 +30,7 @@ pub struct ConfigInfo {
     pub doc_doc_enable: bool,
     pub doc_info_enable: bool,
     pub doc_man_enable: bool,
+    pub font_fontconfig_enable: bool,
     pub intel_microcode: bool,
     pub amd_microcode: bool,
     pub is_x86: bool,
@@ -81,48 +82,49 @@ pub fn nixos_deploy_info(flake_reference: &FlakeReference) -> Result<ConfigInfo,
         in
         {
             inherit (pkgs) system;
-            toplevelOut = config.system.build.toplevel;
-            toplevelDrv = config.system.build.toplevel.drvPath;
-            hostName = config.networking.hostName;
-            fqdnOrHostName = config.networking.fqdnOrHostName;
-            fqdn = tryOrNull config.networking.fqdn;
-            wheelNeedsPassword = config.security.sudo.wheelNeedsPassword;
-            sudoWheelOnly = config.security.sudo.execWheelOnly;
-            sshEnabled = config.services.openssh.enable;
-            sudoEnabled = config.security.sudo.enable;
-            nixTrustsWheel = builtins.elem "@wheel" config.nix.settings.trusted-users;
-            bootSystemd = config.boot.loader.systemd-boot.enable;
+            amdMicrocode = config.hardware.cpu.amd.updateMicrocode;
             bootGrub = config.boot.loader.grub.enable;
-            bootSystemdGenerations = config.boot.loader.systemd-boot.configurationLimit;
             bootGrubGenerations = config.boot.loader.grub.configurationLimit;
-            journaldExtraConfig = config.services.journald.extraConfig;
-            nixExtraOptions = config.nix.extraOptions;
-            docNixosEnabled = config.documentation.nixos.enable;
-            docEnable = config.documentation.enable;
+            bootIsContainer = config.boot.isContainer;
+            bootSystemd = config.boot.loader.systemd-boot.enable;
+            bootSystemdGenerations = config.boot.loader.systemd-boot.configurationLimit;
             docDevEnable = config.documentation.dev.enable;
             docDocEnable = config.documentation.doc.enable;
+            docEnable = config.documentation.enable;
             docInfoEnable = config.documentation.info.enable;
             docManEnable = config.documentation.man.enable;
-            isX86 = pkgs.stdenv.hostPlatform.isx86;
+            docNixosEnabled = config.documentation.nixos.enable;
+            fontFontconfigEnable = config.fonts.fontconfig.enable;
+            fqdn = tryOrNull config.networking.fqdn;
+            fqdnOrHostName = config.networking.fqdnOrHostName;
+            hostName = config.networking.hostName;
             intelMicrocode = config.hardware.cpu.intel.updateMicrocode;
-            amdMicrocode = config.hardware.cpu.amd.updateMicrocode;
-            nginxEnabled = config.services.nginx.enable;
+            isX86 = pkgs.stdenv.hostPlatform.isx86;
+            journaldExtraConfig = config.services.journald.extraConfig;
+            logRefusedConnections = config.networking.firewall.logRefusedConnections;
             nginxBrotli = config.services.nginx.recommendedBrotliSettings;
+            nginxEnabled = config.services.nginx.enable;
             nginxGzip = config.services.nginx.recommendedGzipSettings;
             nginxOptimisation = config.services.nginx.recommendedOptimisation;
             nginxProxy = config.services.nginx.recommendedProxySettings;
             nginxTls = config.services.nginx.recommendedTlsSettings;
+            nixAutoOptimiseStore = config.nix.settings.auto-optimise-store;
+            nixExtraOptions = config.nix.extraOptions;
+            nixGc = config.nix.gc.automatic;
+            nixOptimiseAutomatic = config.nix.optimise.automatic;
+            nixTrustsWheel = builtins.elem "@wheel" config.nix.settings.trusted-users;
+            sshEnabled = config.services.openssh.enable;
+            sudoEnabled = config.security.sudo.enable;
+            sudoWheelOnly = config.security.sudo.execWheelOnly;
+            toplevelDrv = config.system.build.toplevel.drvPath;
+            toplevelOut = config.system.build.toplevel;
+            wheelNeedsPassword = config.security.sudo.wheelNeedsPassword;
             users = map (user: {
                 inherit (user) name extraGroups;
                 sshKeys = user.openssh.authorizedKeys.keys or [];
             }) (builtins.filter
                 (user: (user.isNormalUser or false))
                 (builtins.attrValues config.users.users));
-            nixGc = config.nix.gc.automatic;
-            logRefusedConnections = config.networking.firewall.logRefusedConnections;
-            nixOptimiseAutomatic = config.nix.optimise.automatic;
-            nixAutoOptimiseStore = config.nix.settings.auto-optimise-store;
-            bootIsContainer = config.boot.isContainer;
         }"#;
 
     let output = std::process::Command::new("nix")

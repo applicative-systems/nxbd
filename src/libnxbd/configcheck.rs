@@ -520,6 +520,21 @@ pub fn get_standard_checks() -> Vec<CheckGroup> {
                     },
                 ),
                 Check::new(
+                    "fontconfig",
+                    "Font configuration should be disabled on servers to reduce system closure size",
+                    "Set fonts.fontconfig.enable = false",
+                    |config, _user_info| {
+                        if config.fqdn.is_some() && config.font_fontconfig_enable{
+                            Err(CheckError {
+                                check_name: "Font Configuration".to_string(),
+                                message: "Font configuration is enabled. Consider setting fonts.fontconfig.enable = false on servers".to_string(),
+                            })
+                        } else {
+                            Ok(())
+                        }
+                    },
+                ),
+                Check::new(
                     "nginx_brotli",
                     "Brotli compression should be enabled",
                     "Set services.nginx.recommendedBrotliSettings = true",
