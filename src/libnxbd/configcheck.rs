@@ -406,7 +406,7 @@ pub fn get_standard_checks() -> Vec<CheckGroup> {
             description: "Checks if server-specific optimizations are properly configured".to_string(),
             checks: vec![
                 Check::new(
-                    "doc_nixos_enabled",
+                    "doc_nixos",
                     "NixOS documentation should be disabled to reduce system closure size",
                     "Set documentation.nixos.enable = false",
                     |config, _user_info| {
@@ -425,7 +425,7 @@ pub fn get_standard_checks() -> Vec<CheckGroup> {
                     },
                 ),
                 Check::new(
-                    "doc_enable",
+                    "documentation",
                     "General documentation should be disabled to reduce system closure size",
                     "Set documentation.enable = false",
                     |config, _user_info| {
@@ -444,7 +444,7 @@ pub fn get_standard_checks() -> Vec<CheckGroup> {
                     },
                 ),
                 Check::new(
-                    "doc_dev_enable",
+                    "doc_dev",
                     "Development documentation should be disabled to reduce system closure size",
                     "Set documentation.dev.enable = false",
                     |config, _user_info| {
@@ -463,7 +463,7 @@ pub fn get_standard_checks() -> Vec<CheckGroup> {
                     },
                 ),
                 Check::new(
-                    "doc_doc_enable",
+                    "doc_doc",
                     "Doc documentation should be disabled to reduce system closure size",
                     "Set documentation.doc.enable = false",
                     |config, _user_info| {
@@ -482,7 +482,7 @@ pub fn get_standard_checks() -> Vec<CheckGroup> {
                     },
                 ),
                 Check::new(
-                    "doc_info_enable",
+                    "doc_info",
                     "Info documentation should be disabled to reduce system closure size",
                     "Set documentation.info.enable = false",
                     |config, _user_info| {
@@ -501,7 +501,7 @@ pub fn get_standard_checks() -> Vec<CheckGroup> {
                     },
                 ),
                 Check::new(
-                    "doc_man_enable",
+                    "doc_man",
                     "Man pages should be disabled to reduce system closure size",
                     "Set documentation.man.enable = false",
                     |config, _user_info| {
