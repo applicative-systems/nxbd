@@ -112,7 +112,7 @@ pub fn get_standard_checks() -> Vec<CheckGroup> {
         CheckGroup {
             id: "remote_deployment".to_string(),
             name: "Remote Deployment Support".to_string(),
-            description: "Checks if the system has the required configuration to safely perform remote deployments".to_string(),
+            description: "Checks if the system has the required configuration to safely perform remote deployments. This avoids a lock-out after the deployment.".to_string(),
             checks: vec![
                 Check::new(
                     "ssh_enabled",
@@ -257,7 +257,7 @@ pub fn get_standard_checks() -> Vec<CheckGroup> {
                 ),
                 Check::new(
                     "log_refused_connections",
-                    "Logging of refused connections should be disabled",
+                    "The logging of refused connections should be deactivated to avoid flooding the logs and possibly leaving important messages unseen. Consider using it only for debugging firewall rules.",
                     "Set networking.firewall.logRefusedConnections = false",
                     |config, _user_info| {
                         if config.log_refused_connections {
@@ -279,7 +279,7 @@ pub fn get_standard_checks() -> Vec<CheckGroup> {
             checks: vec![
                 Check::new(
                     "system_generations_limit",
-                    "System generations should be limited",
+                    "The retention of old system generations should be limited, as these are protected from garbage collection and consume disk space unnecessarily.",
                     "Set boot.systemd.generations = 10 or less for systemd-boot, or boot.grub.generations = 10 or less for GRUB",
                     |config, _user_info| {
                         fn check_generations(enabled: bool, limit: Option<i32>, bootloader: &str) -> Result<(), CheckError> {
@@ -311,7 +311,7 @@ pub fn get_standard_checks() -> Vec<CheckGroup> {
                 ),
                 Check::new(
                     "journald_limits",
-                    "journald space limits should be configured",
+                    "journald space limits should be configured to avoid clogging the disk with logs.",
                     "Set either 'SystemKeepFree' or both 'SystemMaxUse' and 'SystemMaxFileSize'",
                     |config, _user_info| {
                         let config_str = &config.journald_extra_config;
@@ -331,7 +331,7 @@ pub fn get_standard_checks() -> Vec<CheckGroup> {
                 ),
                 Check::new(
                     "nix_gc",
-                    "Garbage Collection should be enabled",
+                    "Regular Nix Garbage Collection should be enabled",
                     "Set nix.gc.automatic = true",
                     |config, _user_info| {
                         if !config.nix_gc {
@@ -407,7 +407,7 @@ pub fn get_standard_checks() -> Vec<CheckGroup> {
             checks: vec![
                 Check::new(
                     "doc_nixos_enabled",
-                    "NixOS documentation should be disabled",
+                    "NixOS documentation should be disabled to reduce system closure size",
                     "Set documentation.nixos.enable = false",
                     |config, _user_info| {
                         if config.fqdn.is_some() {
@@ -426,7 +426,7 @@ pub fn get_standard_checks() -> Vec<CheckGroup> {
                 ),
                 Check::new(
                     "doc_enable",
-                    "General documentation should be disabled",
+                    "General documentation should be disabled to reduce system closure size",
                     "Set documentation.enable = false",
                     |config, _user_info| {
                         if config.fqdn.is_some() {
@@ -445,7 +445,7 @@ pub fn get_standard_checks() -> Vec<CheckGroup> {
                 ),
                 Check::new(
                     "doc_dev_enable",
-                    "Development documentation should be disabled",
+                    "Development documentation should be disabled to reduce system closure size",
                     "Set documentation.dev.enable = false",
                     |config, _user_info| {
                         if config.fqdn.is_some() {
@@ -464,7 +464,7 @@ pub fn get_standard_checks() -> Vec<CheckGroup> {
                 ),
                 Check::new(
                     "doc_doc_enable",
-                    "Doc documentation should be disabled",
+                    "Doc documentation should be disabled to reduce system closure size",
                     "Set documentation.doc.enable = false",
                     |config, _user_info| {
                         if config.fqdn.is_some() {
@@ -483,7 +483,7 @@ pub fn get_standard_checks() -> Vec<CheckGroup> {
                 ),
                 Check::new(
                     "doc_info_enable",
-                    "Info documentation should be disabled",
+                    "Info documentation should be disabled to reduce system closure size",
                     "Set documentation.info.enable = false",
                     |config, _user_info| {
                         if config.fqdn.is_some() {
@@ -502,7 +502,7 @@ pub fn get_standard_checks() -> Vec<CheckGroup> {
                 ),
                 Check::new(
                     "doc_man_enable",
-                    "Man pages should be disabled",
+                    "Man pages should be disabled to reduce system closure size",
                     "Set documentation.man.enable = false",
                     |config, _user_info| {
                         if config.fqdn.is_some() {
@@ -623,7 +623,7 @@ pub fn get_standard_checks() -> Vec<CheckGroup> {
             checks: vec![
                 Check::new(
                     "cpu_microcode",
-                    "CPU microcode updates should be enabled",
+                    "CPU microcode updates should be enabled on Intel architecture",
                     "Set either hardware.cpu.intel.updateMicrocode or hardware.cpu.amd.updateMicrocode",
                     |config, _user_info| {
                         if config.is_x86 {
