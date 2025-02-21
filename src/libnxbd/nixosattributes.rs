@@ -8,50 +8,50 @@ use std::str;
 #[serde(rename_all = "camelCase")]
 #[allow(clippy::module_name_repetitions)]
 pub struct ConfigInfo {
-    pub toplevel_out: String,
-    pub toplevel_drv: String,
-    pub host_name: String,
-    pub fqdn_or_host_name: String,
-    pub fqdn: Option<String>,
-    pub wheel_needs_password: bool,
-    pub sudo_wheel_only: bool,
-    pub ssh_enabled: bool,
-    pub ssh_password_authentication: bool,
-    pub sudo_enabled: bool,
-    pub nix_trusts_wheel: bool,
-    pub boot_systemd: bool,
+    pub amd_microcode: bool,
     pub boot_grub: bool,
-    pub boot_systemd_generations: Option<i32>,
     pub boot_grub_generations: Option<i32>,
-    pub journald_extra_config: String,
-    pub nix_extra_options: String,
-    pub doc_nixos_enabled: bool,
-    pub doc_enable: bool,
+    pub boot_is_container: bool,
+    pub boot_systemd: bool,
+    pub boot_systemd_generations: Option<i32>,
+    pub command_not_found: bool,
     pub doc_dev_enable: bool,
     pub doc_doc_enable: bool,
+    pub doc_enable: bool,
     pub doc_info_enable: bool,
     pub doc_man_enable: bool,
+    pub doc_nixos_enabled: bool,
     pub font_fontconfig_enable: bool,
+    pub fqdn: Option<String>,
+    pub fqdn_or_host_name: String,
+    pub host_name: String,
     pub intel_microcode: bool,
-    pub amd_microcode: bool,
     pub is_x86: bool,
-    pub nginx_enabled: bool,
+    pub journald_extra_config: String,
+    pub log_refused_connections: bool,
+    pub networking_firewall_enabled: bool,
     pub nginx_brotli: bool,
+    pub nginx_enabled: bool,
     pub nginx_gzip: bool,
     pub nginx_optimisation: bool,
     pub nginx_proxy: bool,
     pub nginx_tls: bool,
-    pub system: String,
-    pub users: Vec<NixUser>,
-    pub nix_gc: bool,
-    pub log_refused_connections: bool,
-    pub nix_optimise_automatic: bool,
     pub nix_auto_optimise_store: bool,
-    pub boot_is_container: bool,
-    pub networking_firewall_enabled: bool,
-    pub users_mutable: bool,
+    pub nix_extra_options: String,
+    pub nix_gc: bool,
+    pub nix_optimise_automatic: bool,
+    pub nix_trusts_wheel: bool,
+    pub ssh_enabled: bool,
+    pub ssh_password_authentication: bool,
     pub stub_ld: bool,
-    pub command_not_found: bool,
+    pub sudo_enabled: bool,
+    pub sudo_wheel_only: bool,
+    pub system: String,
+    pub toplevel_drv: String,
+    pub toplevel_out: String,
+    pub users: Vec<NixUser>,
+    pub users_mutable: bool,
+    pub wheel_needs_password: bool,
 }
 
 #[derive(Deserialize, Debug)]
@@ -87,12 +87,20 @@ pub fn nixos_deploy_info(flake_reference: &FlakeReference) -> Result<ConfigInfo,
         in
         {
             inherit (pkgs) system;
+            users = map (user: {
+                inherit (user) name extraGroups;
+                sshKeys = user.openssh.authorizedKeys.keys or [];
+            }) (builtins.filter
+                (user: (user.isNormalUser or false))
+                (builtins.attrValues config.users.users));
+
             amdMicrocode = config.hardware.cpu.amd.updateMicrocode;
             bootGrub = config.boot.loader.grub.enable;
             bootGrubGenerations = config.boot.loader.grub.configurationLimit;
             bootIsContainer = config.boot.isContainer;
             bootSystemd = config.boot.loader.systemd-boot.enable;
             bootSystemdGenerations = config.boot.loader.systemd-boot.configurationLimit;
+            commandNotFound = config.programs.command-not-found.enable;
             docDevEnable = config.documentation.dev.enable;
             docDocEnable = config.documentation.doc.enable;
             docEnable = config.documentation.enable;
@@ -107,6 +115,7 @@ pub fn nixos_deploy_info(flake_reference: &FlakeReference) -> Result<ConfigInfo,
             isX86 = pkgs.stdenv.hostPlatform.isx86;
             journaldExtraConfig = config.services.journald.extraConfig;
             logRefusedConnections = config.networking.firewall.logRefusedConnections;
+            networkingFirewallEnabled = config.networking.firewall.enable;
             nginxBrotli = config.services.nginx.recommendedBrotliSettings;
             nginxEnabled = config.services.nginx.enable;
             nginxGzip = config.services.nginx.recommendedGzipSettings;
@@ -118,23 +127,15 @@ pub fn nixos_deploy_info(flake_reference: &FlakeReference) -> Result<ConfigInfo,
             nixGc = config.nix.gc.automatic;
             nixOptimiseAutomatic = config.nix.optimise.automatic;
             nixTrustsWheel = builtins.elem "@wheel" config.nix.settings.trusted-users;
-            networkingFirewallEnabled = config.networking.firewall.enable;
             sshEnabled = config.services.openssh.enable;
             sshPasswordAuthentication = config.services.openssh.settings.PasswordAuthentication;
+            stubLd = config.environment.stub-ld.enable;
             sudoEnabled = config.security.sudo.enable;
             sudoWheelOnly = config.security.sudo.execWheelOnly;
             toplevelDrv = config.system.build.toplevel.drvPath;
             toplevelOut = config.system.build.toplevel;
-            wheelNeedsPassword = config.security.sudo.wheelNeedsPassword;
             usersMutable = config.users.mutableUsers;
-            stubLd = config.environment.stub-ld.enable;
-            commandNotFound = config.programs.command-not-found.enable;
-            users = map (user: {
-                inherit (user) name extraGroups;
-                sshKeys = user.openssh.authorizedKeys.keys or [];
-            }) (builtins.filter
-                (user: (user.isNormalUser or false))
-                (builtins.attrValues config.users.users));
+            wheelNeedsPassword = config.security.sudo.wheelNeedsPassword;
         }"#;
 
     let output = std::process::Command::new("nix")
