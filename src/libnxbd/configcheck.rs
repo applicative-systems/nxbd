@@ -256,6 +256,21 @@ pub fn get_standard_checks() -> Vec<CheckGroup> {
                     },
                 ),
                 Check::new(
+                    "users_immutable",
+                    "Users should be managed through NixOS configuration",
+                    "Set users.mutableUsers = false",
+                    |config, _user_info| {
+                        if config.users_mutable {
+                            Err(CheckError {
+                                check_name: "Mutable Users".to_string(),
+                                message: "Users can be modified outside of the NixOS configuration. Consider setting users.mutableUsers = false for better system reproducibility".to_string(),
+                            })
+                        } else {
+                            Ok(())
+                        }
+                    },
+                ),
+                Check::new(
                     "firewall_enabled",
                     "The system firewall should be enabled for better security",
                     "Set networking.firewall.enable = true",

@@ -48,6 +48,7 @@ pub struct ConfigInfo {
     pub nix_auto_optimise_store: bool,
     pub boot_is_container: bool,
     pub networking_firewall_enabled: bool,
+    pub users_mutable: bool,
 }
 
 #[derive(Deserialize, Debug)]
@@ -121,6 +122,7 @@ pub fn nixos_deploy_info(flake_reference: &FlakeReference) -> Result<ConfigInfo,
             toplevelDrv = config.system.build.toplevel.drvPath;
             toplevelOut = config.system.build.toplevel;
             wheelNeedsPassword = config.security.sudo.wheelNeedsPassword;
+            usersMutable = config.users.mutableUsers;
             users = map (user: {
                 inherit (user) name extraGroups;
                 sshKeys = user.openssh.authorizedKeys.keys or [];
