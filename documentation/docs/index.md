@@ -58,6 +58,21 @@ The smart NixOS Configuration Check, Build, and Deploy Tool
 
 ## Quick Start
 
+First, obtain `nxbd` either via `nix shell`:
+
+```console
+$ nix shell github:applicative-systems/nxbd
+```
+
+...or install it in your nix profile:
+
+```console
+$ nix profile install github:applicative-systems/nxbd
+```
+
+Now you can use it in any repository that contains a `flake.nix` with
+NixOS configurations:
+
 ```console
 # Run all the checks
 $ nxbd check
