@@ -47,6 +47,7 @@ pub struct ConfigInfo {
     pub nix_optimise_automatic: bool,
     pub nix_auto_optimise_store: bool,
     pub boot_is_container: bool,
+    pub networking_firewall_enabled: bool,
 }
 
 #[derive(Deserialize, Debug)]
@@ -113,6 +114,7 @@ pub fn nixos_deploy_info(flake_reference: &FlakeReference) -> Result<ConfigInfo,
             nixGc = config.nix.gc.automatic;
             nixOptimiseAutomatic = config.nix.optimise.automatic;
             nixTrustsWheel = builtins.elem "@wheel" config.nix.settings.trusted-users;
+            networkingFirewallEnabled = config.networking.firewall.enable;
             sshEnabled = config.services.openssh.enable;
             sudoEnabled = config.security.sudo.enable;
             sudoWheelOnly = config.security.sudo.execWheelOnly;

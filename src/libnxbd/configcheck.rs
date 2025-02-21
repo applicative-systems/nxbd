@@ -256,6 +256,21 @@ pub fn get_standard_checks() -> Vec<CheckGroup> {
                     },
                 ),
                 Check::new(
+                    "firewall_enabled",
+                    "The system firewall should be enabled for better security",
+                    "Set networking.firewall.enable = true",
+                    |config, _user_info| {
+                        if !config.networking_firewall_enabled {
+                            Err(CheckError {
+                                check_name: "Firewall".to_string(),
+                                message: "System firewall is not enabled. Consider setting networking.firewall.enable = true".to_string(),
+                            })
+                        } else {
+                            Ok(())
+                        }
+                    },
+                ),
+                Check::new(
                     "log_refused_connections",
                     "The logging of refused connections should be deactivated to avoid flooding the logs and possibly leaving important messages unseen. Consider using it only for debugging firewall rules.",
                     "Set networking.firewall.logRefusedConnections = false",
