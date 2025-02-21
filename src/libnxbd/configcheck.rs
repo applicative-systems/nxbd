@@ -595,6 +595,21 @@ pub fn get_standard_checks() -> Vec<CheckGroup> {
                     },
                 ),
                 Check::new(
+                    "command_not_found",
+                    "The command-not-found program is typically not needed on servers and increases system closure size",
+                    "Set programs.command-not-found.enable = false",
+                    |config, _user_info| {
+                        if config.fqdn.is_some() && config.command_not_found {
+                            Err(CheckError {
+                                check_name: "Command Not Found".to_string(),
+                                message: "The command-not-found program is enabled but typically not needed on servers. Consider setting programs.command-not-found.enable = false to reduce system closure size".to_string(),
+                            })
+                        } else {
+                            Ok(())
+                        }
+                    },
+                ),
+                Check::new(
                     "nginx_brotli",
                     "Brotli compression should be enabled",
                     "Set services.nginx.recommendedBrotliSettings = true",

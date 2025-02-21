@@ -51,6 +51,7 @@ pub struct ConfigInfo {
     pub networking_firewall_enabled: bool,
     pub users_mutable: bool,
     pub stub_ld: bool,
+    pub command_not_found: bool,
 }
 
 #[derive(Deserialize, Debug)]
@@ -127,6 +128,7 @@ pub fn nixos_deploy_info(flake_reference: &FlakeReference) -> Result<ConfigInfo,
             wheelNeedsPassword = config.security.sudo.wheelNeedsPassword;
             usersMutable = config.users.mutableUsers;
             stubLd = config.environment.stub-ld.enable;
+            commandNotFound = config.programs.command-not-found.enable;
             users = map (user: {
                 inherit (user) name extraGroups;
                 sshKeys = user.openssh.authorizedKeys.keys or [];
