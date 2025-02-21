@@ -97,4 +97,13 @@
         overlays.default = import ./overlay.nix;
       };
     };
+
+  nixConfig = {
+    extra-substituters = [
+      "https://appsys.cachix.org"
+    ];
+    extra-trusted-public-keys = [
+      "appsys.cachix.org-1:VoZof6Mp3Aqlj3tQ21wFdxW0lhHTzAu/5q04LYUtXM8="
+    ];
+  };
 }
