@@ -12,7 +12,6 @@ plugins:
   - search
   - tags
 
-
 theme:
   font:
     text: Raleway
@@ -20,6 +19,7 @@ theme:
   name: material
   logo: assets/applicative-systems-square.png
   icon:
+    logo: logo
     repo: fontawesome/brands/github
 
   features:
@@ -53,7 +53,6 @@ theme:
   palette:
     # Palette toggle for automatic mode
     - media: "(prefers-color-scheme)"
-      primary: black
       primary: blue
       accent: light blue
       toggle:
@@ -62,7 +61,6 @@ theme:
 
     # Palette toggle for light mode
     - media: "(prefers-color-scheme: light)"
-      primary: black
       primary: blue
       accent: light blue
       toggle:
@@ -71,16 +69,12 @@ theme:
 
     # Palette toggle for dark mode
     - media: "(prefers-color-scheme: dark)"
-      primary: grey
       primary: blue
       accent: light blue
       scheme: slate
       toggle:
         icon: material/weather-night
         name: Switch to system preference
-  icon:
-    logo: logo
-
 extra:
   social:
     - icon: fontawesome/brands/x-twitter

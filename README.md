@@ -105,6 +105,7 @@ We offer commercial support to help you succeed with `nxbd`:
 - **Consulting**: Infrastructure optimization
 
 Contact us:
+
 - 📧 [hello@applicative.systems](mailto:hello@applicative.systems)
 - 🤝 [Schedule a meeting](https://nixcademy.com/meet)
 
