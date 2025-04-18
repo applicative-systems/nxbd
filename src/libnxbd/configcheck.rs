@@ -355,26 +355,6 @@ pub fn get_standard_checks() -> Vec<CheckGroup> {
                     },
                 ),
                 Check::new(
-                    "journald_limits",
-                    "journald space limits should be configured to avoid clogging the disk with logs.",
-                    "Set either `SystemKeepFree` or both `SystemMaxUse` and `SystemMaxFileSize` in `services.journald.extraConfig`",
-                    |config, _user_info| {
-                        let config_str = &config.journald_extra_config;
-                        let has_max_use = config_str.contains("SystemMaxUse=");
-                        let has_max_file_size = config_str.contains("SystemMaxFileSize=");
-                        let has_keep_free = config_str.contains("SystemKeepFree=");
-
-                        if !has_keep_free && !(has_max_use && has_max_file_size) {
-                            Err(CheckError {
-                                check_name: "Journald Limits".to_string(),
-                                message: "No journald space limits configured. Set either `SystemKeepFree` or both `SystemMaxUse` and `SystemMaxFileSize` in `services.journald.extraConfig`".to_string(),
-                            })
-                        } else {
-                            Ok(())
-                        }
-                    },
-                ),
-                Check::new(
                     "nix_gc",
                     "Regular Nix Garbage Collection should be enabled",
                     "Set  `nix.gc.automatic = true`",

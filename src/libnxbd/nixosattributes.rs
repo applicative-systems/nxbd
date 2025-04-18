@@ -27,7 +27,6 @@ pub struct ConfigInfo {
     pub host_name: String,
     pub intel_microcode: bool,
     pub is_x86: bool,
-    pub journald_extra_config: String,
     pub log_refused_connections: bool,
     pub networking_firewall_enabled: bool,
     pub nginx_brotli: bool,
@@ -114,7 +113,6 @@ pub fn nixos_deploy_info(flake_reference: &FlakeReference) -> Result<ConfigInfo,
             hostName = config.networking.hostName;
             intelMicrocode = config.hardware.cpu.intel.updateMicrocode;
             isX86 = pkgs.stdenv.hostPlatform.isx86;
-            journaldExtraConfig = config.services.journald.extraConfig;
             logRefusedConnections = config.networking.firewall.logRefusedConnections;
             networkingFirewallEnabled = config.networking.firewall.enable;
             nginxBrotli = config.services.nginx.recommendedBrotliSettings;
