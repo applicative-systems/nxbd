@@ -39,7 +39,7 @@ in
       start_all()
       deployer.wait_for_unit("multi-user.target")
 
-      deployer.succeed("mkdir /root/.ssh")
+      deployer.succeed("mkdir -p /root/.ssh")
       deployer.copy_from_host("${snakeOilPrivateKey}", "/root/.ssh/id_ecdsa")
       deployer.succeed("chmod 600 /root/.ssh/id_ecdsa")
       deployer.copy_from_host("${sshConfig}", "/root/.ssh/config")
