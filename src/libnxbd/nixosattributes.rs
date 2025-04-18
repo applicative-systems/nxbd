@@ -38,6 +38,7 @@ pub struct ConfigInfo {
     pub nginx_tls: bool,
     pub nix_auto_optimise_store: bool,
     pub nix_extra_options: String,
+    pub nix_settings_experimental_features: String,
     pub nix_gc: bool,
     pub nix_optimise_automatic: bool,
     pub nix_trusts_wheel: bool,
@@ -124,6 +125,7 @@ pub fn nixos_deploy_info(flake_reference: &FlakeReference) -> Result<ConfigInfo,
             nginxTls = config.services.nginx.recommendedTlsSettings;
             nixAutoOptimiseStore = config.nix.settings.auto-optimise-store;
             nixExtraOptions = config.nix.extraOptions;
+            nixSettingsExperimentalFeatures = config.nix.settings.experimental-features or "";
             nixGc = config.nix.gc.automatic;
             nixOptimiseAutomatic = config.nix.optimise.automatic;
             nixTrustsWheel = builtins.elem "@wheel" config.nix.settings.trusted-users;

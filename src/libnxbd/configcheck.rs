@@ -416,30 +416,26 @@ pub fn get_standard_checks() -> Vec<CheckGroup> {
                 Check::new(
                     "nix_extra_options",
                     "Nix features should include nix-command and flakes",
-                    "Add 'experimental-features = nix-command flakes' to nix.extraOptions",
+                    "Add 'nix-command flakes' to nix.settings.expreimental-features",
                     |config, _user_info| {
-                        if let Some(features_line) = config.nix_extra_options
+                        let features_line = config.nix_extra_options
                             .lines()
                             .find(|line| line.trim().starts_with("experimental-features"))
-                        {
-                            if !features_line.contains("nix-command") {
-                                Err(CheckError {
-                                    check_name: "Nix Features".to_string(),
-                                    message: "Missing required nix feature 'nix-command'. Add it to experimental-features in nix.extraOptions".to_string(),
-                                })
-                            } else if !features_line.contains("flakes") {
-                                Err(CheckError {
-                                    check_name: "Nix Features".to_string(),
-                                    message: "Missing required nix feature 'flakes'. Add it to experimental-features in nix.extraOptions".to_string(),
-                                })
-                            } else {
-                                Ok(())
-                            }
-                        } else {
+                            .unwrap_or("");
+                        if !features_line.contains("nix-command")
+                            && !config.nix_settings_experimental_features.contains("nix-command") {
                             Err(CheckError {
                                 check_name: "Nix Features".to_string(),
-                                message: "No experimental-features configured. Add 'experimental-features = nix-command flakes' to nix.extraOptions".to_string(),
+                                message: "Missing required nix feature 'nix-command'. Add it to experimental-features in nix.extraOptions".to_string(),
                             })
+                        } else if !features_line.contains("flakes")
+                            && !config.nix_settings_experimental_features.contains("flakes") {
+                            Err(CheckError {
+                                check_name: "Nix Features".to_string(),
+                                message: "Missing required nix feature 'flakes'. Add it to experimental-features in nix.extraOptions".to_string(),
+                            })
+                        } else {
+                            Ok(())
                         }
                     },
                 ),
