@@ -362,6 +362,7 @@ fn run() -> Result<(), NxbdError> {
             for system in &system_attributes {
                 let result = nixos_deploy_info(system)?;
                 eprintln!("{}", format!("→ Building system: {}", system).white());
+                realise_toplevel_output_paths(&[system.clone()])?;
                 eprintln!(
                     "{}",
                     format!("→ Built store path for {}: {}", system, result.toplevel_out).white()
