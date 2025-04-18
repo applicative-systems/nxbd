@@ -92,6 +92,11 @@
             // {
               formatting = treefmtEval.config.build.check inputs.self;
             };
+
+          apps.watch-documentation = lib.mkForce {
+            type = "app";
+            program = "";
+          };
         };
       flake = {
         overlays.default = import ./overlay.nix;
