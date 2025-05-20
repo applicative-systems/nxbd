@@ -66,11 +66,12 @@ pub struct CheckGroupResult {
     pub checks: Vec<CheckResult>,
 }
 
+pub type IgnoreMap = HashMap<String, Vec<String>>;
+
 pub fn run_all_checks(
     config: &ConfigInfo,
     user_info: &UserInfo,
-    ignored_checks: Option<&HashMap<String, HashMap<String, Vec<String>>>>,
-    system: &FlakeReference,
+    ignored_checks: Option<&IgnoreMap>,
 ) -> Vec<CheckGroupResult> {
     get_standard_checks()
         .iter()
@@ -82,7 +83,6 @@ pub fn run_all_checks(
                     let passed = check.check(config, user_info).is_ok();
                     let ignored = !passed
                         && ignored_checks
-                            .and_then(|ic| ic.get(&system.to_string()))
                             .and_then(|system_map| system_map.get(&group.id))
                             .map(|checks| checks.contains(&check.id))
                             .unwrap_or(false);
@@ -747,7 +747,7 @@ pub fn save_failed_checks_to_ignore_file(
 
     // Update map with new results
     for (system, results) in system_results {
-        let mut system_map: HashMap<String, Vec<String>> = HashMap::new();
+        let mut system_map: IgnoreMap = HashMap::new();
 
         for group in results {
             let failed_checks: Vec<String> = group
@@ -764,10 +764,10 @@ pub fn save_failed_checks_to_ignore_file(
 
         if !system_map.is_empty() {
             // Replace or insert the system's ignored checks
-            ignore_map.insert(system.to_string(), system_map);
+            ignore_map.insert(system.attribute.clone(), system_map);
         } else {
             // If no failures for this system, remove it from ignored checks
-            ignore_map.remove(&system.to_string());
+            ignore_map.remove(&system.attribute);
         }
     }
 
@@ -779,7 +779,7 @@ pub fn save_failed_checks_to_ignore_file(
     Ok(())
 }
 
-pub fn load_ignored_checks(path: &str) -> Option<HashMap<String, HashMap<String, Vec<String>>>> {
+pub fn load_ignored_checks(path: &str) -> Option<HashMap<String, IgnoreMap>> {
     match fs::read_to_string(path) {
         Ok(contents) => serde_yaml::from_str(&contents).ok(),
         Err(_) => None,

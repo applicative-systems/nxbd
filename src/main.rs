@@ -121,13 +121,11 @@ fn flakerefs_or_default(refs: &[FlakeReference]) -> Result<Vec<FlakeReference>, 
 }
 
 fn run_system_checks(
-    system: &FlakeReference,
     info: &ConfigInfo,
     user_info: &UserInfo,
-    ignore_file: &str,
+    system_ignore_map: Option<&libnxbd::configcheck::IgnoreMap>,
 ) -> Result<Vec<(String, String)>, NixError> {
-    let ignored_checks = load_ignored_checks(ignore_file);
-    let results = run_all_checks(info, user_info, ignored_checks.as_ref(), system);
+    let results = run_all_checks(info, user_info, system_ignore_map);
     let mut failures = Vec::new();
 
     for group in &results {
@@ -429,12 +427,19 @@ fn run() -> Result<(), NxbdError> {
 
             // Run checks first (unless ignored)
             if !ignore_checks {
+                // Load ignored checks once
+                let ignored_checks_map = load_ignored_checks(".nxbd-ignore.yaml");
+
                 let mut all_failures = Vec::new();
                 for (system, info) in &deploy_infos {
                     match info {
                         Ok(info) => {
-                            let failures =
-                                run_system_checks(system, info, &user_info, ".nxbd-ignore.yaml")?;
+                            // Extract the right ignore map for the current system
+                            let system_ignore_map = ignored_checks_map
+                                .as_ref()
+                                .and_then(|map| map.get(&system.attribute));
+
+                            let failures = run_system_checks(info, &user_info, system_ignore_map)?;
                             if !failures.is_empty() {
                                 all_failures.push((system.clone(), failures));
                             }
@@ -598,12 +603,15 @@ fn run() -> Result<(), NxbdError> {
 
             // Run checks first (unless ignored)
             if !ignore_checks {
-                let failures = run_system_checks(
-                    &system_attribute,
-                    &deploy_info,
-                    &user_info,
-                    ".nxbd-ignore.yaml",
-                )?;
+                // Load ignored checks once
+                let ignored_checks_map = load_ignored_checks(".nxbd-ignore.yaml");
+
+                // Extract the right ignore map for the current system
+                let system_ignore_map = ignored_checks_map
+                    .as_ref()
+                    .and_then(|map| map.get(&system_attribute.attribute));
+
+                let failures = run_system_checks(&deploy_info, &user_info, system_ignore_map)?;
                 if !failures.is_empty() {
                     return Err(NxbdError::ChecksFailed {
                         failures: vec![(system_attribute.clone(), failures)],
@@ -683,10 +691,11 @@ fn run() -> Result<(), NxbdError> {
                 .iter()
                 .filter_map(|(system, info)| {
                     info.as_ref().ok().map(|i| {
-                        (
-                            system,
-                            run_all_checks(i, &user_info, ignored_checks.as_ref(), system),
-                        )
+                        let system_ignore_map = ignored_checks
+                            .as_ref()
+                            .and_then(|map| map.get(&system.attribute));
+
+                        (system, run_all_checks(i, &user_info, system_ignore_map))
                     })
                 })
                 .collect();
