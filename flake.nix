@@ -63,13 +63,17 @@
           };
 
           devShells.default = pkgs.mkShell {
-            inputsFrom = [ config.packages.nxbd ];
             nativeBuildInputs = [
+              pkgs.cargo
               pkgs.cargo-edit
               pkgs.cargo-watch
               pkgs.clippy
+              pkgs.rustc
               treefmtEval.config.build.wrapper
             ];
+
+            RUST_SRC_PATH = pkgs.rust.packages.stable.rustPlatform.rustLibSrc;
+            RUST_BACKTRACE = 1;
           };
 
           documentation.mkdocs-root = pkgs.runCommand "documentation-root" { } ''
