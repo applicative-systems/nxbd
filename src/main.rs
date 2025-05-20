@@ -26,6 +26,9 @@ use std::io;
 
 #[derive(Debug)]
 enum NxbdError {
+    EvaluationFails {
+        failures: Vec<(FlakeReference, NixError)>,
+    },
     ChecksFailed {
         failures: Vec<(FlakeReference, Vec<(String, String)>)>, // (system, [(group_id, check_id)])
         is_switch: bool,
@@ -41,6 +44,13 @@ enum NxbdError {
 impl fmt::Display for NxbdError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Self::EvaluationFails { failures } => {
+                writeln!(f, "The following configs have evaluation errors:")?;
+                for (system, error) in failures {
+                    writeln!(f, "  - {}: {}", system, error)?;
+                }
+                Ok(())
+            }
             Self::ChecksFailed {
                 failures,
                 is_switch,
@@ -391,6 +401,21 @@ fn run() -> Result<(), NxbdError> {
                     .par_iter()
                     .map(|system| (system.clone(), nixos_deploy_info(system)))
                     .collect();
+
+            // Check if any configurations had evaluation errors
+            let evaluation_errors: Vec<(FlakeReference, NixError)> = deploy_infos
+                .iter()
+                .filter_map(|(system, result)| match result {
+                    Err(err) => Some((system.clone(), err.clone())),
+                    _ => None,
+                })
+                .collect();
+
+            if !evaluation_errors.is_empty() {
+                return Err(NxbdError::EvaluationFails {
+                    failures: evaluation_errors,
+                });
+            }
 
             println!(
                 "Switching systems: {}",
