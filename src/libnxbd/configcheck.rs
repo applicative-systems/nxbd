@@ -456,7 +456,7 @@ pub fn get_standard_checks() -> Vec<CheckGroup> {
                 Check::new(
                     "nix_extra_options",
                     "Nix features should include nix-command and flakes",
-                    "Add 'nix-command flakes' to nix.settings.expreimental-features",
+                    "Add 'nix-command flakes' to nix.settings.experimental-features",
                     |config, _user_info| {
                         let features_line = config.nix_extra_options
                             .lines()
