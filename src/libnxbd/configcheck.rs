@@ -872,9 +872,68 @@ pub fn parse_ignore_string(s: &str) -> Result<IgnoreMap, ParseIgnoreError> {
     Ok(ignore_map)
 }
 
+/// Merges two IgnoreMaps into a new IgnoreMap
+///
+/// Rules for merging:
+/// 1. If a group exists in only one map, it is copied to the result
+/// 2. If a group exists in both maps:
+///    a. If either map has an empty vector for the group (ignore all), the result has an empty vector
+///    b. Otherwise, the result has the union of the checks from both maps
+///
+/// # Examples
+///
+/// ```
+/// let map1 = parse_ignore_string("group1.check1,group2.*").unwrap();
+/// let map2 = parse_ignore_string("group1.check2,group3.check3").unwrap();
+///
+/// // Result will have:
+/// // - group1: [check1, check2]  (union)
+/// // - group2: []                (empty vector preserved)
+/// // - group3: [check3]          (from map2)
+/// let merged = merge_ignore_maps(&map1, &map2);
+/// ```
+pub fn merge_ignore_maps(map1: &IgnoreMap, map2: &IgnoreMap) -> IgnoreMap {
+    let mut result = IgnoreMap::new();
+
+    // First, process all groups from map1
+    for (group, checks) in map1 {
+        if checks.is_empty() {
+            // If map1 has an empty vector (ignore all), preserve it in the result
+            result.insert(group.clone(), vec![]);
+        } else if let Some(other_checks) = map2.get(group) {
+            if other_checks.is_empty() {
+                // If map2 has an empty vector (ignore all), prefer it
+                result.insert(group.clone(), vec![]);
+            } else {
+                // Both maps have specific checks, merge them
+                let mut merged_checks = checks.clone();
+                // Add checks from map2 that aren't already in the result
+                for check in other_checks {
+                    if !merged_checks.contains(check) {
+                        merged_checks.push(check.clone());
+                    }
+                }
+                result.insert(group.clone(), merged_checks);
+            }
+        } else {
+            // Group only exists in map1, copy it
+            result.insert(group.clone(), checks.clone());
+        }
+    }
+
+    // Then add any groups from map2 that weren't in map1
+    for (group, checks) in map2 {
+        if !result.contains_key(group) {
+            result.insert(group.clone(), checks.clone());
+        }
+    }
+
+    result
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{parse_ignore_string, ParseIgnoreError};
+    use super::{merge_ignore_maps, parse_ignore_string, ParseIgnoreError};
     use crate::libnxbd::nixosattributes::ConfigInfo;
     use crate::libnxbd::nixosattributes::NixUser;
     use crate::libnxbd::sshkeys::SshKeyInfo;
@@ -1101,5 +1160,102 @@ mod tests {
             parse_ignore_string("group1."),
             Err(ParseIgnoreError::EmptyCheck(_))
         ));
+    }
+
+    #[test]
+    fn test_merge_ignore_maps() {
+        // Test case 1: Non-overlapping groups
+        let map1 = parse_ignore_string("group1.check1").unwrap();
+        let map2 = parse_ignore_string("group2.check2").unwrap();
+        let merged = merge_ignore_maps(&map1, &map2);
+
+        assert_eq!(merged.len(), 2);
+        assert_eq!(merged.get("group1").unwrap().len(), 1);
+        assert_eq!(merged.get("group1").unwrap()[0], "check1");
+        assert_eq!(merged.get("group2").unwrap().len(), 1);
+        assert_eq!(merged.get("group2").unwrap()[0], "check2");
+
+        // Test case 2: Overlapping groups with specific checks
+        let map1 = parse_ignore_string("group1.check1,group2.check2").unwrap();
+        let map2 = parse_ignore_string("group1.check3,group3.check4").unwrap();
+        let merged = merge_ignore_maps(&map1, &map2);
+
+        assert_eq!(merged.len(), 3);
+        assert_eq!(merged.get("group1").unwrap().len(), 2);
+        assert!(merged
+            .get("group1")
+            .unwrap()
+            .contains(&"check1".to_string()));
+        assert!(merged
+            .get("group1")
+            .unwrap()
+            .contains(&"check3".to_string()));
+        assert_eq!(merged.get("group2").unwrap().len(), 1);
+        assert_eq!(merged.get("group2").unwrap()[0], "check2");
+        assert_eq!(merged.get("group3").unwrap().len(), 1);
+        assert_eq!(merged.get("group3").unwrap()[0], "check4");
+
+        // Test case 3: Duplicate checks in the same group
+        let map1 = parse_ignore_string("group1.check1,group1.check2").unwrap();
+        let map2 = parse_ignore_string("group1.check2,group1.check3").unwrap();
+        let merged = merge_ignore_maps(&map1, &map2);
+
+        assert_eq!(merged.len(), 1);
+        assert_eq!(merged.get("group1").unwrap().len(), 3);
+        assert!(merged
+            .get("group1")
+            .unwrap()
+            .contains(&"check1".to_string()));
+        assert!(merged
+            .get("group1")
+            .unwrap()
+            .contains(&"check2".to_string()));
+        assert!(merged
+            .get("group1")
+            .unwrap()
+            .contains(&"check3".to_string()));
+
+        // Test case 4: Empty vector in first map (ignore all checks in group)
+        let map1 = parse_ignore_string("group1.*,group2.check1").unwrap();
+        let map2 = parse_ignore_string("group1.check2,group3.check3").unwrap();
+        let merged = merge_ignore_maps(&map1, &map2);
+
+        assert_eq!(merged.len(), 3);
+        assert_eq!(
+            merged.get("group1").unwrap().len(),
+            0,
+            "Empty vector should be preserved"
+        );
+        assert_eq!(merged.get("group2").unwrap().len(), 1);
+        assert_eq!(merged.get("group3").unwrap().len(), 1);
+
+        // Test case 5: Empty vector in second map (ignore all checks in group)
+        let map1 = parse_ignore_string("group1.check1,group2.check2").unwrap();
+        let map2 = parse_ignore_string("group1.*,group3.check3").unwrap();
+        let merged = merge_ignore_maps(&map1, &map2);
+
+        assert_eq!(merged.len(), 3);
+        assert_eq!(
+            merged.get("group1").unwrap().len(),
+            0,
+            "Empty vector from map2 should be preferred"
+        );
+        assert_eq!(merged.get("group2").unwrap().len(), 1);
+        assert_eq!(merged.get("group3").unwrap().len(), 1);
+
+        // Test case 6: Empty maps
+        let map1 = parse_ignore_string("").unwrap();
+        let map2 = parse_ignore_string("").unwrap();
+        let merged = merge_ignore_maps(&map1, &map2);
+
+        assert_eq!(merged.len(), 0);
+
+        // Test case 7: One empty map, one with content
+        let map1 = parse_ignore_string("").unwrap();
+        let map2 = parse_ignore_string("group1.check1").unwrap();
+        let merged = merge_ignore_maps(&map1, &map2);
+
+        assert_eq!(merged.len(), 1);
+        assert_eq!(merged.get("group1").unwrap().len(), 1);
     }
 }
