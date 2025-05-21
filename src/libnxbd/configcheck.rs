@@ -794,8 +794,87 @@ pub fn load_ignored_checks(path: &str) -> Option<HashMap<String, IgnoreMap>> {
     }
 }
 
+/// Error type for parse_ignore_string
+#[derive(Debug)]
+pub enum ParseIgnoreError {
+    /// No group specified (missing `.` in item)
+    NoGroup(String),
+    /// Empty group name
+    EmptyGroup(String),
+    /// Empty check name (except when using wildcard)
+    EmptyCheck(String),
+}
+
+impl fmt::Display for ParseIgnoreError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::NoGroup(item) => write!(f, "No group specified in '{}' (missing '.')", item),
+            Self::EmptyGroup(item) => write!(f, "Empty group name in '{}'", item),
+            Self::EmptyCheck(item) => write!(f, "Empty check name in '{}'", item),
+        }
+    }
+}
+
+/// Parses a comma-separated list of group.check or group.* items into an IgnoreMap
+///
+/// Format: group1.check1,group2.check2,group3.*
+///
+/// Examples:
+/// - `remote_deployment.ssh_enabled` - Ignore specific check
+/// - `hardware_configuration.*` - Ignore all checks in group (empty vector)
+/// - `group1.check1,group2.*` - Multiple ignore rules
+///
+/// Returns an IgnoreMap where:
+/// - Keys are group IDs
+/// - Values are lists of check IDs to ignore
+/// - An empty vector means "ignore all checks in this group" (wildcard)
+pub fn parse_ignore_string(s: &str) -> Result<IgnoreMap, ParseIgnoreError> {
+    let mut ignore_map = IgnoreMap::new();
+
+    // Split by commas
+    for item in s.split(',') {
+        let item = item.trim();
+        if item.is_empty() {
+            continue; // Skip empty items
+        }
+
+        // Each item should be in the format "group.check" or "group.*"
+        let parts: Vec<&str> = item.split('.').collect();
+
+        if parts.len() != 2 {
+            return Err(ParseIgnoreError::NoGroup(item.to_string()));
+        }
+
+        let group = parts[0].trim();
+        let check = parts[1].trim();
+
+        if group.is_empty() {
+            return Err(ParseIgnoreError::EmptyGroup(item.to_string()));
+        }
+
+        if check.is_empty() {
+            return Err(ParseIgnoreError::EmptyCheck(item.to_string()));
+        }
+
+        // Handle wildcards
+        if check == "*" {
+            // Empty vector means "ignore all checks in this group"
+            ignore_map.insert(group.to_string(), vec![]);
+        } else {
+            // Add the specific check to the group's ignore list
+            ignore_map
+                .entry(group.to_string())
+                .or_insert_with(Vec::new)
+                .push(check.to_string());
+        }
+    }
+
+    Ok(ignore_map)
+}
+
 #[cfg(test)]
 mod tests {
+    use super::{parse_ignore_string, ParseIgnoreError};
     use crate::libnxbd::nixosattributes::ConfigInfo;
     use crate::libnxbd::nixosattributes::NixUser;
     use crate::libnxbd::sshkeys::SshKeyInfo;
@@ -958,5 +1037,69 @@ mod tests {
         );
         assert!(!failures_with_empty_vector.contains(&("hardware_configuration".to_string(), "cpu_microcode".to_string())),
             "Expected hardware_configuration.cpu_microcode to be ignored with empty vector in ignore map");
+    }
+
+    #[test]
+    fn test_parse_ignore_string() {
+        // Test parsing a single group and check
+        let result = parse_ignore_string("group1.check1").unwrap();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result.get("group1").unwrap().len(), 1);
+        assert_eq!(result.get("group1").unwrap()[0], "check1");
+
+        // Test parsing a group with wildcard
+        let result = parse_ignore_string("group2.*").unwrap();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result.get("group2").unwrap().len(), 0);
+
+        // Test parsing multiple entries
+        let result = parse_ignore_string("group1.check1,group2.*,group3.check3").unwrap();
+        assert_eq!(result.len(), 3);
+        assert_eq!(result.get("group1").unwrap().len(), 1);
+        assert_eq!(result.get("group1").unwrap()[0], "check1");
+        assert_eq!(result.get("group2").unwrap().len(), 0);
+        assert_eq!(result.get("group3").unwrap().len(), 1);
+        assert_eq!(result.get("group3").unwrap()[0], "check3");
+
+        // Test parsing multiple checks in the same group
+        let result = parse_ignore_string("group1.check1,group1.check2").unwrap();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result.get("group1").unwrap().len(), 2);
+        assert!(result
+            .get("group1")
+            .unwrap()
+            .contains(&"check1".to_string()));
+        assert!(result
+            .get("group1")
+            .unwrap()
+            .contains(&"check2".to_string()));
+
+        // Test parsing with spaces
+        let result = parse_ignore_string(" group1.check1 , group2.* ").unwrap();
+        assert_eq!(result.len(), 2);
+        assert_eq!(result.get("group1").unwrap().len(), 1);
+        assert_eq!(result.get("group2").unwrap().len(), 0);
+
+        // Test parsing with empty input
+        let result = parse_ignore_string("").unwrap();
+        assert_eq!(result.len(), 0);
+
+        // Test parsing with extra commas (should be ignored)
+        let result = parse_ignore_string("group1.check1,,group2.*,").unwrap();
+        assert_eq!(result.len(), 2);
+
+        // Test error cases
+        assert!(matches!(
+            parse_ignore_string("invalid"),
+            Err(ParseIgnoreError::NoGroup(_))
+        ));
+        assert!(matches!(
+            parse_ignore_string(".check1"),
+            Err(ParseIgnoreError::EmptyGroup(_))
+        ));
+        assert!(matches!(
+            parse_ignore_string("group1."),
+            Err(ParseIgnoreError::EmptyCheck(_))
+        ));
     }
 }
