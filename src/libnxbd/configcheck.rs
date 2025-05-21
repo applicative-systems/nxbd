@@ -66,6 +66,9 @@ pub struct CheckGroupResult {
     pub checks: Vec<CheckResult>,
 }
 
+/// Map of group IDs to check IDs to ignore
+///
+/// A key with an empty vector means "ignore all checks in this group"
 pub type IgnoreMap = HashMap<String, Vec<String>>;
 
 pub fn run_all_checks(
@@ -81,10 +84,15 @@ pub fn run_all_checks(
                 .iter()
                 .map(|check| {
                     let passed = check.check(config, user_info).is_ok();
+                    // A check is ignored if:
+                    // 1. It's failed (not passed) AND
+                    // 2. Either:
+                    //    a. It's in a group with an empty vector in the ignore map (ignore all in group)
+                    //    b. It's specifically listed in the ignore map
                     let ignored = !passed
                         && ignored_checks
                             .and_then(|system_map| system_map.get(&group.id))
-                            .map(|checks| checks.contains(&check.id))
+                            .map(|checks| checks.is_empty() || checks.contains(&check.id))
                             .unwrap_or(false);
 
                     CheckResult {
@@ -928,5 +936,27 @@ mod tests {
             )),
             "Expected hardware_configuration.cpu_microcode to fail with partial ignores"
         );
+
+        // Test 4: With empty vector in ignore map (should ignore ALL checks in that group)
+        let mut empty_vector_ignore_map = HashMap::new();
+
+        // Use empty vector to ignore all checks in hardware_configuration
+        empty_vector_ignore_map.insert("hardware_configuration".to_string(), vec![]);
+
+        let failures_with_empty_vector =
+            run_system_checks(&config_info, &user_info, Some(&empty_vector_ignore_map)).unwrap();
+        assert_eq!(
+            failures_with_empty_vector.len(),
+            1,
+            "Expected exactly one failure with empty vector in ignore map, got: {:?}",
+            failures_with_empty_vector
+        );
+        assert!(
+            failures_with_empty_vector
+                .contains(&("remote_deployment".to_string(), "ssh_enabled".to_string())),
+            "Expected remote_deployment.ssh_enabled to fail with empty vector in ignore map"
+        );
+        assert!(!failures_with_empty_vector.contains(&("hardware_configuration".to_string(), "cpu_microcode".to_string())),
+            "Expected hardware_configuration.cpu_microcode to be ignored with empty vector in ignore map");
     }
 }
