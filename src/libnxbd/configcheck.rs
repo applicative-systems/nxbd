@@ -1,9 +1,11 @@
 use super::FlakeReference;
 use super::{nixosattributes::ConfigInfo, userinfo::UserInfo};
+use serde::{Deserialize, Serialize};
 use serde_yaml;
 use std::collections::HashMap;
 use std::fmt;
 use std::fs;
+use std::str::FromStr;
 
 #[derive(Debug)]
 pub struct CheckError {
@@ -17,6 +19,7 @@ impl fmt::Display for CheckError {
     }
 }
 
+#[allow(clippy::struct_field_names, clippy::type_complexity)]
 pub struct Check {
     pub id: String,
     pub description: String,
@@ -69,7 +72,51 @@ pub struct CheckGroupResult {
 /// Map of group IDs to check IDs to ignore
 ///
 /// A key with an empty vector means "ignore all checks in this group"
-pub type IgnoreMap = HashMap<String, Vec<String>>;
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct IgnoreMap(pub HashMap<String, Vec<String>>);
+
+impl IgnoreMap {
+    pub fn new() -> Self {
+        IgnoreMap(HashMap::new())
+    }
+
+    pub fn insert(&mut self, key: String, value: Vec<String>) -> Option<Vec<String>> {
+        self.0.insert(key, value)
+    }
+
+    pub fn get(&self, key: &str) -> Option<&Vec<String>> {
+        self.0.get(key)
+    }
+
+    pub fn contains_key(&self, key: &str) -> bool {
+        self.0.contains_key(key)
+    }
+
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+}
+
+impl FromStr for IgnoreMap {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        parse_ignore_string(s).map_err(|e| e.to_string())
+    }
+}
+
+impl<'a> IntoIterator for &'a IgnoreMap {
+    type Item = (&'a String, &'a Vec<String>);
+    type IntoIter = std::collections::hash_map::Iter<'a, String, Vec<String>>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.iter()
+    }
+}
 
 pub fn run_all_checks(
     config: &ConfigInfo,
@@ -92,8 +139,7 @@ pub fn run_all_checks(
                     let ignored = !passed
                         && ignored_checks
                             .and_then(|system_map| system_map.get(&group.id))
-                            .map(|checks| checks.is_empty() || checks.contains(&check.id))
-                            .unwrap_or(false);
+                            .is_some_and(|checks| checks.is_empty() || checks.contains(&check.id));
 
                     CheckResult {
                         id: check.id.clone(),
@@ -115,6 +161,12 @@ pub fn run_all_checks(
         .collect()
 }
 
+#[allow(
+    clippy::too_many_lines,
+    clippy::if_not_else,
+    clippy::struct_field_names,
+    clippy::type_complexity
+)]
 pub fn get_standard_checks() -> Vec<CheckGroup> {
     vec![
         CheckGroup {
@@ -755,7 +807,7 @@ pub fn save_failed_checks_to_ignore_file(
 
     // Update map with new results
     for (system, results) in system_results {
-        let mut system_map: IgnoreMap = HashMap::new();
+        let mut system_map_inner = HashMap::new();
 
         for group in results {
             let failed_checks: Vec<String> = group
@@ -766,13 +818,13 @@ pub fn save_failed_checks_to_ignore_file(
                 .collect();
 
             if !failed_checks.is_empty() {
-                system_map.insert(group.id.clone(), failed_checks);
+                system_map_inner.insert(group.id.clone(), failed_checks);
             }
         }
 
-        if !system_map.is_empty() {
+        if !system_map_inner.is_empty() {
             // Replace or insert the system's ignored checks
-            ignore_map.insert(system.attribute.clone(), system_map);
+            ignore_map.insert(system.attribute.clone(), IgnoreMap(system_map_inner));
         } else {
             // If no failures for this system, remove it from ignored checks
             ignore_map.remove(&system.attribute);
@@ -829,7 +881,7 @@ impl fmt::Display for ParseIgnoreError {
 /// - Values are lists of check IDs to ignore
 /// - An empty vector means "ignore all checks in this group" (wildcard)
 pub fn parse_ignore_string(s: &str) -> Result<IgnoreMap, ParseIgnoreError> {
-    let mut ignore_map = IgnoreMap::new();
+    let mut inner_map = HashMap::new();
 
     // Split by commas
     for item in s.split(',') {
@@ -859,17 +911,17 @@ pub fn parse_ignore_string(s: &str) -> Result<IgnoreMap, ParseIgnoreError> {
         // Handle wildcards
         if check == "*" {
             // Empty vector means "ignore all checks in this group"
-            ignore_map.insert(group.to_string(), vec![]);
+            inner_map.insert(group.to_string(), vec![]);
         } else {
             // Add the specific check to the group's ignore list
-            ignore_map
+            inner_map
                 .entry(group.to_string())
                 .or_insert_with(Vec::new)
                 .push(check.to_string());
         }
     }
 
-    Ok(ignore_map)
+    Ok(IgnoreMap(inner_map))
 }
 
 /// Merges two IgnoreMaps into a new IgnoreMap
@@ -933,7 +985,7 @@ pub fn merge_ignore_maps(map1: &IgnoreMap, map2: &IgnoreMap) -> IgnoreMap {
 
 #[cfg(test)]
 mod tests {
-    use super::{merge_ignore_maps, parse_ignore_string, ParseIgnoreError};
+    use super::{merge_ignore_maps, parse_ignore_string, IgnoreMap, ParseIgnoreError};
     use crate::libnxbd::nixosattributes::ConfigInfo;
     use crate::libnxbd::nixosattributes::NixUser;
     use crate::libnxbd::sshkeys::SshKeyInfo;
@@ -1030,7 +1082,7 @@ mod tests {
         );
 
         // Test 2: With ignore map containing all failures, we should have no failures
-        let mut ignore_map = HashMap::new();
+        let mut ignore_map = IgnoreMap::new();
 
         // Add both failures to ignore map
         ignore_map.insert(
@@ -1051,7 +1103,7 @@ mod tests {
         );
 
         // Test 3: With partial ignore map, we should have one failure
-        let mut partial_ignore_map = HashMap::new();
+        let mut partial_ignore_map = IgnoreMap::new();
 
         // Only ignore ssh_enabled
         partial_ignore_map.insert(
@@ -1076,7 +1128,7 @@ mod tests {
         );
 
         // Test 4: With empty vector in ignore map (should ignore ALL checks in that group)
-        let mut empty_vector_ignore_map = HashMap::new();
+        let mut empty_vector_ignore_map = IgnoreMap::new();
 
         // Use empty vector to ignore all checks in hardware_configuration
         empty_vector_ignore_map.insert("hardware_configuration".to_string(), vec![]);

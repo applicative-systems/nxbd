@@ -5,7 +5,7 @@ use crate::cli::{Cli, Command};
 use clap::{CommandFactory, Parser};
 use libnxbd::{
     configcheck::{
-        get_standard_checks, load_ignored_checks, run_all_checks,
+        get_standard_checks, load_ignored_checks, merge_ignore_maps, run_all_checks,
         save_failed_checks_to_ignore_file, CheckGroupResult,
     },
     nixcommands::{
@@ -381,6 +381,7 @@ fn run() -> Result<(), NxbdError> {
             systems,
             ignore_checks,
             reboot,
+            ignored_checks,
         } => {
             let system_attributes = flakerefs_or_default(systems)?;
 
@@ -427,7 +428,7 @@ fn run() -> Result<(), NxbdError> {
 
             // Run checks first (unless ignored)
             if !ignore_checks {
-                // Load ignored checks once
+                // Load ignored checks from file
                 let ignored_checks_map = load_ignored_checks(".nxbd-ignore.yaml");
 
                 let mut all_failures = Vec::new();
@@ -435,11 +436,22 @@ fn run() -> Result<(), NxbdError> {
                     match info {
                         Ok(info) => {
                             // Extract the right ignore map for the current system
-                            let system_ignore_map = ignored_checks_map
+                            let mut system_ignore_map = ignored_checks_map
                                 .as_ref()
-                                .and_then(|map| map.get(&system.attribute));
+                                .and_then(|map| map.get(&system.attribute))
+                                .cloned();
 
-                            let failures = run_system_checks(info, &user_info, system_ignore_map)?;
+                            // Merge with command line ignored checks if provided
+                            if let Some(cmd_ignores) = &ignored_checks {
+                                system_ignore_map = if let Some(map) = system_ignore_map {
+                                    Some(merge_ignore_maps(&map, cmd_ignores))
+                                } else {
+                                    Some(cmd_ignores.clone())
+                                };
+                            }
+
+                            let failures =
+                                run_system_checks(info, &user_info, system_ignore_map.as_ref())?;
                             if !failures.is_empty() {
                                 all_failures.push((system.clone(), failures));
                             }
@@ -584,6 +596,7 @@ fn run() -> Result<(), NxbdError> {
             system,
             ignore_hostname,
             ignore_checks,
+            ignored_checks,
         } => {
             let local_hostname = unistd::gethostname()
                 .expect("Failed getting hostname")
@@ -607,11 +620,22 @@ fn run() -> Result<(), NxbdError> {
                 let ignored_checks_map = load_ignored_checks(".nxbd-ignore.yaml");
 
                 // Extract the right ignore map for the current system
-                let system_ignore_map = ignored_checks_map
+                let mut system_ignore_map = ignored_checks_map
                     .as_ref()
-                    .and_then(|map| map.get(&system_attribute.attribute));
+                    .and_then(|map| map.get(&system_attribute.attribute))
+                    .cloned();
 
-                let failures = run_system_checks(&deploy_info, &user_info, system_ignore_map)?;
+                // Merge with command line ignored checks if provided
+                if let Some(cmd_ignores) = &ignored_checks {
+                    system_ignore_map = if let Some(map) = system_ignore_map {
+                        Some(merge_ignore_maps(&map, cmd_ignores))
+                    } else {
+                        Some(cmd_ignores.clone())
+                    };
+                }
+
+                let failures =
+                    run_system_checks(&deploy_info, &user_info, system_ignore_map.as_ref())?;
                 if !failures.is_empty() {
                     return Err(NxbdError::ChecksFailed {
                         failures: vec![(system_attribute.clone(), failures)],
@@ -653,9 +677,10 @@ fn run() -> Result<(), NxbdError> {
             systems,
             save_ignore,
             ignore_file,
+            ignored_checks,
         } => {
             let system_attributes = flakerefs_or_default(systems)?;
-            let ignored_checks = load_ignored_checks(&ignore_file);
+            let file_ignored_checks = load_ignored_checks(&ignore_file);
 
             eprintln!(
                 "Reading configurations of {}...",
@@ -691,11 +716,25 @@ fn run() -> Result<(), NxbdError> {
                 .iter()
                 .filter_map(|(system, info)| {
                     info.as_ref().ok().map(|i| {
-                        let system_ignore_map = ignored_checks
+                        // Extract the right ignore map for the current system
+                        let mut system_ignore_map = file_ignored_checks
                             .as_ref()
-                            .and_then(|map| map.get(&system.attribute));
+                            .and_then(|map| map.get(&system.attribute))
+                            .cloned();
 
-                        (system, run_all_checks(i, &user_info, system_ignore_map))
+                        // Merge with command line ignored checks if provided
+                        if let Some(cmd_ignores) = &ignored_checks {
+                            system_ignore_map = if let Some(map) = system_ignore_map {
+                                Some(merge_ignore_maps(&map, cmd_ignores))
+                            } else {
+                                Some(cmd_ignores.clone())
+                            };
+                        }
+
+                        (
+                            system,
+                            run_all_checks(i, &user_info, system_ignore_map.as_ref()),
+                        )
                     })
                 })
                 .collect();

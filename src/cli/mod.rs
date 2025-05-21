@@ -1,6 +1,7 @@
 use clap::{Parser, Subcommand};
 
 use crate::libnxbd;
+use crate::libnxbd::configcheck::IgnoreMap;
 
 const SYSTEMS_HELP: &str = "System selection in flakes attribute syntax (e.g., `.#hostname` or `github:user/repo#hostname`).";
 const SYSTEMS_ALL_HELP: &str = "Can be one or many. Will select all systems in the flake in the current directory if not specified.";
@@ -63,6 +64,12 @@ and the (optional) FQDN and is obtained via `config.networking.fqdnOrHostName`.
             help = "Automatically reboot if required by kernel/initrd changes"
         )]
         reboot: bool,
+
+        #[arg(
+            long,
+            help = "Comma-separated list of checks to ignore in format group.check or group.* (e.g., 'remote_deployment.ssh_enabled,hardware_configuration.*')"
+        )]
+        ignored_checks: Option<IgnoreMap>,
     },
 
     #[command(about = "Deploy configuration to the local system")]
@@ -82,6 +89,12 @@ If no system is specified, it uses the current hostname as the flake attribute s
 
         #[arg(long, help = "Skip pre-deployment configuration checks")]
         ignore_checks: bool,
+
+        #[arg(
+            long,
+            help = "Comma-separated list of checks to ignore in format group.check or group.* (e.g., 'remote_deployment.ssh_enabled,hardware_configuration.*')"
+        )]
+        ignored_checks: Option<IgnoreMap>,
     },
 
     #[command(about = "Run configuration checks")]
@@ -104,6 +117,12 @@ If no system is specified, it uses the current hostname as the flake attribute s
             default_value = ".nxbd-ignore.yaml"
         )]
         ignore_file: String,
+
+        #[arg(
+            long,
+            help = "Comma-separated list of checks to ignore in format group.check or group.* (e.g., 'remote_deployment.ssh_enabled,hardware_configuration.*')"
+        )]
+        ignored_checks: Option<IgnoreMap>,
     },
 
     #[command(about = "List all available configuration checks")]
