@@ -785,3 +785,148 @@ pub fn load_ignored_checks(path: &str) -> Option<HashMap<String, IgnoreMap>> {
         Err(_) => None,
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::libnxbd::nixosattributes::ConfigInfo;
+    use crate::libnxbd::nixosattributes::NixUser;
+    use crate::libnxbd::sshkeys::SshKeyInfo;
+    use crate::libnxbd::userinfo::UserInfo;
+    use crate::run_system_checks;
+    use std::collections::HashMap;
+
+    #[test]
+    fn test_run_system_checks_with_ignores() {
+        // Create a minimal ConfigInfo that will fail some checks
+        let config_info = ConfigInfo {
+            ssh_enabled: false, // This will fail ssh_enabled check
+            sudo_enabled: true,
+            wheel_needs_password: false,
+            nix_trusts_wheel: true,
+            users: vec![NixUser {
+                name: "testuser".to_string(),
+                ssh_keys: vec![SshKeyInfo {
+                    key_type: "ssh-rsa".to_string(),
+                    key_data: "AAAAB3NzaC1yc2EAAAADAQABAAABAQC".to_string(),
+                    comment: "test@example.com".to_string(),
+                }],
+                extra_groups: vec!["wheel".to_string()],
+            }],
+            sudo_wheel_only: true,
+            ssh_password_authentication: false,
+            users_mutable: false,
+            networking_firewall_enabled: true,
+            log_refused_connections: false,
+            boot_systemd: false,
+            boot_grub: false,
+            boot_systemd_generations: None,
+            boot_grub_generations: None,
+            nix_gc: true,
+            nix_optimise_automatic: true,
+            nix_auto_optimise_store: false,
+            nix_extra_options: "".to_string(),
+            nix_settings_experimental_features: "nix-command flakes".to_string(),
+            fqdn: None,
+            doc_nixos_enabled: false,
+            doc_enable: false,
+            doc_dev_enable: false,
+            doc_doc_enable: false,
+            doc_info_enable: false,
+            doc_man_enable: false,
+            font_fontconfig_enable: false,
+            stub_ld: false,
+            command_not_found: false,
+            nginx_enabled: false,
+            nginx_brotli: false,
+            nginx_gzip: false,
+            nginx_optimisation: false,
+            nginx_proxy: false,
+            nginx_tls: false,
+            is_x86: true,
+            intel_microcode: false, // This will fail cpu_microcode check
+            amd_microcode: false,
+            boot_is_container: false,
+            host_name: "testhost".to_string(),
+            system: "x86_64-linux".to_string(),
+            toplevel_out: "/nix/store/test-path".to_string(),
+            toplevel_drv: "/nix/store/test-drv.drv".to_string(),
+            fqdn_or_host_name: "testhost".to_string(),
+        };
+
+        // Create a minimal UserInfo
+        let user_info = UserInfo {
+            username: "testuser".to_string(),
+            ssh_keys: vec![SshKeyInfo {
+                key_type: "ssh-rsa".to_string(),
+                key_data: "AAAAB3NzaC1yc2EAAAADAQABAAABAQC".to_string(),
+                comment: "test@example.com".to_string(),
+            }],
+            system: "x86_64-linux".to_string(),
+            extra_platforms: vec![],
+            remote_builders: vec![],
+        };
+
+        // Test 1: Without any ignores, we should have failures
+        let failures = run_system_checks(&config_info, &user_info, None).unwrap();
+        assert!(!failures.is_empty(), "Expected failures without ignores");
+
+        // Verify specific failures: ssh_enabled and cpu_microcode
+        assert!(
+            failures.contains(&("remote_deployment".to_string(), "ssh_enabled".to_string())),
+            "Expected remote_deployment.ssh_enabled to fail"
+        );
+        assert!(
+            failures.contains(&(
+                "hardware_configuration".to_string(),
+                "cpu_microcode".to_string()
+            )),
+            "Expected hardware_configuration.cpu_microcode to fail"
+        );
+
+        // Test 2: With ignore map containing all failures, we should have no failures
+        let mut ignore_map = HashMap::new();
+
+        // Add both failures to ignore map
+        ignore_map.insert(
+            "remote_deployment".to_string(),
+            vec!["ssh_enabled".to_string()],
+        );
+        ignore_map.insert(
+            "hardware_configuration".to_string(),
+            vec!["cpu_microcode".to_string()],
+        );
+
+        let failures_with_ignores =
+            run_system_checks(&config_info, &user_info, Some(&ignore_map)).unwrap();
+        assert!(
+            failures_with_ignores.is_empty(),
+            "Expected no failures with ignores, got: {:?}",
+            failures_with_ignores
+        );
+
+        // Test 3: With partial ignore map, we should have one failure
+        let mut partial_ignore_map = HashMap::new();
+
+        // Only ignore ssh_enabled
+        partial_ignore_map.insert(
+            "remote_deployment".to_string(),
+            vec!["ssh_enabled".to_string()],
+        );
+
+        let failures_with_partial_ignores =
+            run_system_checks(&config_info, &user_info, Some(&partial_ignore_map)).unwrap();
+        assert_eq!(
+            failures_with_partial_ignores.len(),
+            1,
+            "Expected exactly one failure with partial ignores, got: {:?}",
+            failures_with_partial_ignores
+        );
+        assert!(
+            failures_with_partial_ignores.contains(&(
+                "hardware_configuration".to_string(),
+                "cpu_microcode".to_string()
+            )),
+            "Expected hardware_configuration.cpu_microcode to fail with partial ignores"
+        );
+    }
+}
