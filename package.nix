@@ -21,13 +21,6 @@ rustPlatform.buildRustPackage {
 
   cargoLock.lockFile = ./Cargo.lock;
 
-  buildInputs = lib.optionals stdenv.isDarwin [
-    darwin.apple_sdk.frameworks.CoreFoundation
-    darwin.apple_sdk.frameworks.Security
-    darwin.apple_sdk.frameworks.IOKit
-    darwin.libiconv
-  ];
-
   doCheck = true;
 
   meta = with lib; {
