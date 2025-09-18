@@ -1,8 +1,6 @@
 {
   lib,
-  stdenv,
   rustPlatform,
-  darwin,
 }:
 
 rustPlatform.buildRustPackage {

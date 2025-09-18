@@ -373,7 +373,7 @@ pub fn check_system_status(host: Option<&str>) -> Result<SystemStatus, NixError>
 
     // If any of these fail to parse, the system is considered unreachable
     let current_generation = match lines.next().map(|s| s.trim().to_string()) {
-        Some(gen) if !gen.is_empty() => gen,
+        Some(generation) if !generation.is_empty() => generation,
         _ => return Ok(SystemStatus::Unreachable),
     };
 

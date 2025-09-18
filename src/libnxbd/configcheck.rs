@@ -985,7 +985,7 @@ pub fn merge_ignore_maps(map1: &IgnoreMap, map2: &IgnoreMap) -> IgnoreMap {
 
 #[cfg(test)]
 mod tests {
-    use super::{merge_ignore_maps, parse_ignore_string, IgnoreMap, ParseIgnoreError};
+    use super::{IgnoreMap, ParseIgnoreError, merge_ignore_maps, parse_ignore_string};
     use crate::libnxbd::nixosattributes::ConfigInfo;
     use crate::libnxbd::nixosattributes::NixUser;
     use crate::libnxbd::sshkeys::SshKeyInfo;
@@ -1146,8 +1146,13 @@ mod tests {
                 .contains(&("remote_deployment".to_string(), "ssh_enabled".to_string())),
             "Expected remote_deployment.ssh_enabled to fail with empty vector in ignore map"
         );
-        assert!(!failures_with_empty_vector.contains(&("hardware_configuration".to_string(), "cpu_microcode".to_string())),
-            "Expected hardware_configuration.cpu_microcode to be ignored with empty vector in ignore map");
+        assert!(
+            !failures_with_empty_vector.contains(&(
+                "hardware_configuration".to_string(),
+                "cpu_microcode".to_string()
+            )),
+            "Expected hardware_configuration.cpu_microcode to be ignored with empty vector in ignore map"
+        );
     }
 
     #[test]
@@ -1176,14 +1181,18 @@ mod tests {
         let result = parse_ignore_string("group1.check1,group1.check2").unwrap();
         assert_eq!(result.len(), 1);
         assert_eq!(result.get("group1").unwrap().len(), 2);
-        assert!(result
-            .get("group1")
-            .unwrap()
-            .contains(&"check1".to_string()));
-        assert!(result
-            .get("group1")
-            .unwrap()
-            .contains(&"check2".to_string()));
+        assert!(
+            result
+                .get("group1")
+                .unwrap()
+                .contains(&"check1".to_string())
+        );
+        assert!(
+            result
+                .get("group1")
+                .unwrap()
+                .contains(&"check2".to_string())
+        );
 
         // Test parsing with spaces
         let result = parse_ignore_string(" group1.check1 , group2.* ").unwrap();
@@ -1234,14 +1243,18 @@ mod tests {
 
         assert_eq!(merged.len(), 3);
         assert_eq!(merged.get("group1").unwrap().len(), 2);
-        assert!(merged
-            .get("group1")
-            .unwrap()
-            .contains(&"check1".to_string()));
-        assert!(merged
-            .get("group1")
-            .unwrap()
-            .contains(&"check3".to_string()));
+        assert!(
+            merged
+                .get("group1")
+                .unwrap()
+                .contains(&"check1".to_string())
+        );
+        assert!(
+            merged
+                .get("group1")
+                .unwrap()
+                .contains(&"check3".to_string())
+        );
         assert_eq!(merged.get("group2").unwrap().len(), 1);
         assert_eq!(merged.get("group2").unwrap()[0], "check2");
         assert_eq!(merged.get("group3").unwrap().len(), 1);
@@ -1254,18 +1267,24 @@ mod tests {
 
         assert_eq!(merged.len(), 1);
         assert_eq!(merged.get("group1").unwrap().len(), 3);
-        assert!(merged
-            .get("group1")
-            .unwrap()
-            .contains(&"check1".to_string()));
-        assert!(merged
-            .get("group1")
-            .unwrap()
-            .contains(&"check2".to_string()));
-        assert!(merged
-            .get("group1")
-            .unwrap()
-            .contains(&"check3".to_string()));
+        assert!(
+            merged
+                .get("group1")
+                .unwrap()
+                .contains(&"check1".to_string())
+        );
+        assert!(
+            merged
+                .get("group1")
+                .unwrap()
+                .contains(&"check2".to_string())
+        );
+        assert!(
+            merged
+                .get("group1")
+                .unwrap()
+                .contains(&"check3".to_string())
+        );
 
         // Test case 4: Empty vector in first map (ignore all checks in group)
         let map1 = parse_ignore_string("group1.*,group2.check1").unwrap();

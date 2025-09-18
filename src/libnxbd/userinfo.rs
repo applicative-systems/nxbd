@@ -1,4 +1,4 @@
-use super::nixcommands::{get_remote_builders, get_system, NixError, RemoteBuilder};
+use super::nixcommands::{NixError, RemoteBuilder, get_remote_builders, get_system};
 use super::sshkeys::SshKeyInfo;
 use std::env;
 use std::process::Command;

@@ -4,18 +4,18 @@ mod libnxbd;
 use crate::cli::{Cli, Command};
 use clap::{CommandFactory, Parser};
 use libnxbd::{
+    FlakeReference, NixError,
     configcheck::{
-        get_standard_checks, load_ignored_checks, merge_ignore_maps, run_all_checks,
-        save_failed_checks_to_ignore_file, CheckGroupResult,
+        CheckGroupResult, get_standard_checks, load_ignored_checks, merge_ignore_maps,
+        run_all_checks, save_failed_checks_to_ignore_file,
     },
     nixcommands::{
-        activate_profile, check_system_status, copy_to_host, nixos_configuration_flakerefs,
-        realise_drv_remotely, realise_toplevel_output_paths, reboot_host, switch_to_configuration,
-        SystemStatus,
+        SystemStatus, activate_profile, check_system_status, copy_to_host,
+        nixos_configuration_flakerefs, realise_drv_remotely, realise_toplevel_output_paths,
+        reboot_host, switch_to_configuration,
     },
-    nixosattributes::{nixos_deploy_info, ConfigInfo},
+    nixosattributes::{ConfigInfo, nixos_deploy_info},
     userinfo::UserInfo,
-    FlakeReference, NixError,
 };
 use nix::unistd;
 use owo_colors::OwoColorize;
@@ -64,17 +64,26 @@ impl fmt::Display for NxbdError {
                 }
                 writeln!(f)?;
                 if *is_switch {
-                    write!(f, "To proceed, either:\n - Fix the failing checks\n - Run 'nxbd check --save-ignore' to ignore these checks\n - Rerun with --ignore-checks")
+                    write!(
+                        f,
+                        "To proceed, either:\n - Fix the failing checks\n - Run 'nxbd check --save-ignore' to ignore these checks\n - Rerun with --ignore-checks"
+                    )
                 } else {
-                    write!(f, "To proceed, either:\n - Fix the failing checks\n - Run 'nxbd check --save-ignore' to ignore these checks")
+                    write!(
+                        f,
+                        "To proceed, either:\n - Fix the failing checks\n - Run 'nxbd check --save-ignore' to ignore these checks"
+                    )
                 }
             }
             Self::LocalHostnameMismatch {
                 config_hostname,
                 local_hostname,
             } => {
-                write!(f, "Hostname mismatch: system config has '{}' but local system is '{}'\nTo proceed, either:\n - Fix the hostname\n - Rerun with --ignore-hostname",
-                    config_hostname, local_hostname)
+                write!(
+                    f,
+                    "Hostname mismatch: system config has '{}' but local system is '{}'\nTo proceed, either:\n - Fix the hostname\n - Rerun with --ignore-hostname",
+                    config_hostname, local_hostname
+                )
             }
             Self::Nix(e) => write!(f, "{}", e),
             Self::Io(e) => write!(f, "IO error: {}", e),
