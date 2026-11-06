@@ -86,7 +86,7 @@ pub fn nixos_deploy_info(flake_reference: &FlakeReference) -> Result<ConfigInfo,
             in if r.success then r.value else null;
         in
         {
-            inherit (pkgs) system;
+            inherit (pkgs.stdenv.hostPlatform) system;
             users = map (user: {
                 inherit (user) name extraGroups;
                 sshKeys = user.openssh.authorizedKeys.keys or [];
@@ -123,7 +123,9 @@ pub fn nixos_deploy_info(flake_reference: &FlakeReference) -> Result<ConfigInfo,
             nginxTls = config.services.nginx.recommendedTlsSettings;
             nixAutoOptimiseStore = config.nix.settings.auto-optimise-store;
             nixExtraOptions = config.nix.extraOptions;
-            nixSettingsExperimentalFeatures = config.nix.settings.experimental-features or "";
+            nixSettingsExperimentalFeatures =
+              let features = config.nix.settings.experimental-features or "";
+              in if builtins.isList features then builtins.concatStringsSep " " features else features;
             nixGc = config.nix.gc.automatic;
             nixOptimiseAutomatic = config.nix.optimise.automatic;
             nixTrustsWheel = builtins.elem "@wheel" config.nix.settings.trusted-users;

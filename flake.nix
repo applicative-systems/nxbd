@@ -2,109 +2,134 @@
   description = "nxbd - NixOS Build and Deploy Tool";
 
   inputs = {
-    flake-parts.url = "github:hercules-ci/flake-parts";
-    flake-parts.inputs.nixpkgs-lib.follows = "nixpkgs";
-
-    mkdocs-flake.url = "github:applicative-systems/mkdocs-flake";
-
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
 
-    treefmt-nix.url = "github:numtide/treefmt-nix";
+    mkdocs-flake.url = "github:applicative-systems/mkdocs-flake";
   };
 
   outputs =
     inputs:
-    inputs.flake-parts.lib.mkFlake { inherit inputs; } {
-      systems = [
-        "x86_64-linux"
-        "aarch64-linux"
-        "aarch64-darwin"
-        "x86_64-darwin"
-      ];
-      imports = [
-        inputs.mkdocs-flake.flakeModules.default
-      ];
-      perSystem =
-        {
-          config,
-          lib,
-          pkgs,
-          system,
-          ...
-        }:
-        let
-          treefmtEval = inputs.treefmt-nix.lib.evalModule pkgs {
-            projectRootFile = "flake.nix";
-            programs = {
-              deadnix.enable = true;
-              # disabled for now because mkdocs wants 4 spaces indent for
-              # multi level bullet point lists, but mdformat doesn't allow it.
-              mdformat.enable = false;
-              nixfmt.enable = true;
-              rustfmt.enable = true;
-              shfmt.enable = true;
-              statix.enable = true;
-              taplo.enable = true;
-            };
-          };
-        in
-        {
-          _module.args.pkgs = import inputs.nixpkgs {
-            inherit system;
-            overlays = [
-              inputs.self.overlays.default
-            ];
-            config = { };
-          };
+    let
+      eachSystem =
+        f:
+        builtins.mapAttrs (
+          system: pkgs': f system (pkgs'.extend inputs.self.overlays.default)
+        ) inputs.nixpkgs.legacyPackages;
 
-          packages = {
-            inherit (pkgs) nxbd;
-            default = config.packages.nxbd;
-          };
+      inherit (inputs.nixpkgs) lib;
+    in
+    {
+      overlays.default = import ./overlay.nix;
 
-          devShells.default = pkgs.mkShell {
-            nativeBuildInputs = [
+      packages = eachSystem (
+        system: pkgs:
+        {
+          inherit (pkgs) nxbd;
+          default = pkgs.nxbd;
+        }
+        // pkgs.lib.optionalAttrs (inputs.mkdocs-flake.packages ? ${system}) {
+          documentation = pkgs.runCommand "nxbd-documentation" { nativeBuildInputs = [ pkgs.nxbd ]; } ''
+            cp -r ${./documentation}/* .
+            chmod -R u+w .
+            nxbd generate-docs docs
+            ${inputs.mkdocs-flake.packages.${system}.mkdocs}/bin/mkdocs build --site-dir $out
+          '';
+        }
+      );
+
+      devShells = eachSystem (
+        system: pkgs: {
+          default = pkgs.mkShell {
+            inputsFrom = [ pkgs.nxbd ];
+
+            packages = [
               pkgs.cargo
               pkgs.cargo-edit
               pkgs.cargo-watch
               pkgs.clippy
+              pkgs.rust-analyzer
               pkgs.rustc
-              treefmtEval.config.build.wrapper
+              pkgs.rustfmt
+              inputs.self.formatter.${system}
             ];
 
             RUST_SRC_PATH = pkgs.rust.packages.stable.rustPlatform.rustLibSrc;
             RUST_BACKTRACE = 1;
           };
+        }
+      );
 
-          documentation.mkdocs-root = pkgs.runCommand "documentation-root" { } ''
-            mkdir $out
-            cp -r ${./documentation}/* "$out"
-            chmod -R 777 "$out"/*
-            ${pkgs.nxbd}/bin/nxbd generate-docs "$out/docs"
-          '';
-
-          formatter = treefmtEval.config.build.wrapper;
-
-          checks =
-            config.packages
-            // lib.optionalAttrs (pkgs.stdenv.isx86_64 && pkgs.stdenv.isLinux) {
-              # Should run on all CPUs, but first we need to make the system
-              # attribute inside the config a bit more dynamic.
-              switch-local = pkgs.testers.runNixOSTest ./tests/switch-local.nix;
-              switch-remote = pkgs.testers.runNixOSTest ./tests/switch-remote.nix;
-            }
-            // {
-              formatting = treefmtEval.config.build.check inputs.self;
+      formatter = eachSystem (
+        _system: pkgs:
+        pkgs.treefmt.withConfig {
+          settings = {
+            tree-root-file = "flake.nix";
+            on-unmatched = "info";
+            formatter = {
+              nixfmt = {
+                command = lib.getExe pkgs.nixfmt;
+                includes = [ "*.nix" ];
+              };
+              statix = {
+                command = lib.getExe pkgs.statix;
+                options = [ "fix" ];
+                no-positional-arg-support = true;
+                includes = [ "*.nix" ];
+              };
+              deadnix = {
+                command = lib.getExe pkgs.deadnix;
+                options = [ "--edit" ];
+                includes = [ "*.nix" ];
+              };
+              rustfmt = {
+                command = lib.getExe pkgs.rustfmt;
+                options = [
+                  "--config"
+                  "skip_children=true"
+                  "--edition"
+                  "2024"
+                ];
+                includes = [ "*.rs" ];
+              };
+              taplo = {
+                command = lib.getExe pkgs.taplo;
+                options = [ "format" ];
+                includes = [ "*.toml" ];
+              };
+              # No markdown formatter: mkdocs wants 4 spaces indent for
+              # multi level bullet point lists, which formatters break.
+              shfmt = {
+                command = lib.getExe pkgs.shfmt;
+                options = [
+                  "-w"
+                  "-i"
+                  "2"
+                  "-s"
+                ];
+                includes = [
+                  "*.sh"
+                  "*.bash"
+                  "*.envrc"
+                ];
+              };
             };
-
-          apps.watch-documentation = lib.mkForce {
-            type = "app";
-            program = "";
           };
-        };
-      flake = {
-        overlays.default = import ./overlay.nix;
-      };
+        }
+      );
+
+      checks = eachSystem (
+        system: pkgs:
+        inputs.self.packages.${system}
+        // pkgs.lib.optionalAttrs (pkgs.stdenv.hostPlatform.isx86_64 && pkgs.stdenv.hostPlatform.isLinux) {
+          # Should run on all CPUs, but first we need to make the system
+          # attribute inside the config a bit more dynamic.
+          switch-local = pkgs.testers.runNixOSTest ./tests/switch-local.nix;
+          switch-remote = pkgs.testers.runNixOSTest ./tests/switch-remote.nix;
+        }
+        // {
+          formatting = inputs.self.formatter.${system}.check inputs.self;
+        }
+      );
     };
 
   nixConfig = {
