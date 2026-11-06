@@ -4,6 +4,7 @@ let
   sshConfig = builtins.toFile "ssh.conf" ''
     UserKnownHostsFile=/dev/null
     StrictHostKeyChecking=no
+    BatchMode=yes
   '';
 
   inherit (import (pkgs.path + "/nixos/tests/ssh-keys.nix") pkgs) snakeOilPrivateKey;
@@ -31,8 +32,18 @@ in
     { nodes, ... }:
     let
       targetNetworkJSON = pkgs.writeText "target-network.json" (
-        builtins.toJSON nodes.server.system.build.networkConfig
+        builtins.toJSON (
+          networkConfig
+          // {
+            # These options only exist inside the NixOS test framework.
+            networking = builtins.removeAttrs networkConfig.networking [
+              "primaryIPAddress"
+              "primaryIPv6Address"
+            ];
+          }
+        )
       );
+      inherit (nodes.server.system.build) networkConfig;
 
     in
     ''

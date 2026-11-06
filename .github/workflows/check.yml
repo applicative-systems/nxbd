@@ -17,6 +17,4 @@ jobs:
         with:
           name: appsys
           authToken: "${{ secrets.CACHIX_AUTH_TOKEN }}"
-      - name: Free up disk space
-        run: sudo rm -rf /usr/share /usr/local /opt || true
       - run: nix flake check -L
